@@ -131,8 +131,8 @@ class KINECT(object):
             frame.show()
 
         # Get Camera Space after recording loop
-        for i, frame in enumerate(recorded_frames):
-            recorded_frames[i].camera_space = self.get_camera_space( frame.camera_space )
+        for i, frame in enumerate(frames):
+            frames[i].camera_space = self.get_camera_space( frame.camera_space )
         
         print('Recording is Finished')        
         return frames

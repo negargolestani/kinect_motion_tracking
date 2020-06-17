@@ -12,10 +12,10 @@ if __name__ == '__main__':
 
     file_name = 'record_02'
     frames = load_record(file_name)
-    # times, markers, _ = target.tarck(frames)
 
-    # print(np.shape(markers))
+    times, markers, _ = target.tarck(frames)
     # save_markers(times, markers, file_name)
+    
     times, markers = load_markers(file_name)
 
 
