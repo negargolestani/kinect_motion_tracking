@@ -1,13 +1,16 @@
 from utils import* 
 
+
 ################################################################################################################################################
 if __name__ == '__main__':
 
-    record_name = 'record_01'
-    record_file_path = records_folder_path  + '/' + record_name 
+    file_name = 'record_02'
 
     kinect = KINECT()
-    kinect.record( record_file_path )
+    record_frames = kinect.record()
 
+    save_record(record_frames, file_name)
+    # recorded_frames = load_record(file_name)
+    
 ################################################################################################################################################
         
