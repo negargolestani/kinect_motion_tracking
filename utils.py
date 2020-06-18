@@ -13,15 +13,14 @@ from pykinect2 import PyKinectV2
 from pykinect2.PyKinectV2 import *
 from pykinect2 import PyKinectRuntime
 
-delimator = ';'
-datime_format = '%y-%m-%d-%H-%M-%S'
 
 main_directory = str( Path(__file__).parents[1] )
+calibsest_folder_path = main_directory + '/calibration_setting'
 records_folder_path = main_directory + '/data/records'
 markers_folder_path = main_directory + '/data/markers'
 
-calibsest_folder_path = main_directory + '/calibration_setting'
-color_range_filename =  'color_ranges_default'
+datime_format = '%y-%m-%d-%H-%M-%S'
+delimator = ';'
 
 
 
@@ -77,9 +76,6 @@ class KINECT(object):
         print('Recording is Finished')        
         return rec
 ####################################################################################################################################################
-
-
-
 ####################################################################################################################################################
 class FRAME(object):
     ################################################################################################################################################    
@@ -238,9 +234,6 @@ class MOTION(object):
                 self.times.append(frame_time)
                 self.locations.append( frame_markers_location )
 ####################################################################################################################################################
-
-
-
 
 
 

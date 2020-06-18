@@ -84,5 +84,4 @@ if __name__ == '__main__':
     # get_image( image_name)                                                                      # Get Image
     color_setting = get_color_setting( image_name,  color_names )  # get dict() of color ranges
     save_color_setting( color_setting, color_range_file_name )    
-
 ####################################################################################################################################################
