@@ -166,14 +166,6 @@ class RECORD(object):
         for frame in self.frames:
             frame.show(wait=wait)
     ################################################################################################################################################    
-    def get_makers_motion(self, color_range, n_markers=2, show=False):    
-        motion = MOTION()
-        for frame in self.frames:
-            time = frame.time
-            locations = frame.get_markers_location(color_range, n_markers, show=show) 
-            motion.add_value( frame.time, locations)
-        return motion
-    ################################################################################################################################################    
     def save(self, file_name):
         file_path = file_path = records_folder_path + '/' + file_name + '.pickle'
         create_folder(file_path)                            # Create folder if it does not exist    
@@ -185,22 +177,30 @@ class RECORD(object):
         file_path = file_path = records_folder_path + '/' + file_name + '.pickle'
         if os.path.exists(file_path): 
             self.frames = pickle.load(open(file_path, 'rb')) 
+    ################################################################################################################################################    
+    def get_makers_motion(self, color_range, n_markers=2, show=False):    
+        motion = MOTION()
+        for frame in self.frames:
+            time = frame.time
+            locations = frame.get_markers_location(color_range, n_markers, show=show) 
+            motion.add_value( frame.time, locations)
+        return motion
 ####################################################################################################################################################    
 class MOTION(object):
-    ############################################################################################################################################
+    ################################################################################################################################################
     def __init__(self, file_name=None):
         self.locations = list()        
         self.times = list()
         if file_name is not None: self.load(file_name)
-    ############################################################################################################################################
+    ################################################################################################################################################
     def set_value(self, times, locations):
         self.times = times
         self.locations = locations
-    ############################################################################################################################################
+    ################################################################################################################################################
     def add_value(self, time, locations):
         self.times.append(time)
         self.locations.append(locations)
-    ############################################################################################################################################
+    ################################################################################################################################################
     def save(self, file_name):
         # Save markers' center  (camera space) as "txt" file 
         file_path = markers_folder_path + '/' + file_name + '.txt'
@@ -219,7 +219,7 @@ class MOTION(object):
             f.write( data_txt )   
             
         return
-    ############################################################################################################################################
+    ################################################################################################################################################
     def load(self, file_name):
         file_path = markers_folder_path + '/' + file_name + '.txt'
         if os.path.exists(file_path):
