@@ -53,8 +53,8 @@ class KINECT(object):
                 depth_image = depth_frame.reshape((self.kinect.depth_frame_desc.Height, self.kinect.depth_frame_desc.Width)).astype(np.uint8)
 
                 if full_data:
-                    camera_space = self.get_camera_space(self.kinect._depth_frame_data)
-                    FRAME(time, color_image, depth_image, camera_space)
+                    camera_space = self.get_camera_space(depth_frame_)
+                    return FRAME(time, color_image, depth_image, camera_space)
                 else:
                    return FRAME(time, color_image, depth_image, depth_frame_) # return depth_frame_ instead of camera_space for faster recording 
     ################################################################################################################################################    
@@ -143,7 +143,7 @@ class FRAME(object):
             camera_points.append(camera_point )
         return camera_points
     ################################################################################################################################################
-    def get_markers_location(self, color_range, n_markers):
+    def get_markers_location(self, color_range, n_markers, show=False):
         markers_location = list()
         frame_contours = self.color_2_circle_contours(color_range, n_Contours=n_markers)    
         for contour in frame_contours:
@@ -151,6 +151,7 @@ class FRAME(object):
             camera_points = self.color_points_2_camera_points(color_points)     # Targeted points in camera space
             marker_location = np.nanmean(camera_points, axis=0)                 # Average of targeted points in camera space -> Markers center
             markers_location.append( marker_location )
+        if show: self.show(contours=frame_contours, wait=1000)
         return markers_location
 ####################################################################################################################################################
 class RECORD(object):
@@ -165,17 +166,22 @@ class RECORD(object):
     def add_value(self, frame):
         self.frames.append(frame)
     ################################################################################################################################################    
-    def get_makers_motion(self, color_range, n_markers=2):    
+    def play(self, wait=1000):
+        for frame in self.frames:
+            frame.show(wait=wait)
+    ################################################################################################################################################    
+    def get_makers_motion(self, color_range, n_markers=2, show=False):    
         motion = MOTION()
         for frame in self.frames:
             time = frame.time
-            locations = frame.get_markers_location(color_range, n_markers) 
+            locations = frame.get_markers_location(color_range, n_markers, show=show) 
             motion.add_value( frame.time, locations)
         return motion
     ################################################################################################################################################    
     def save(self, file_name):
         file_path = file_path = records_folder_path + '/' + file_name + '.pickle'
         create_folder(file_path)                            # Create folder if it does not exist    
+        
         pickle.dump( self.frames, open(file_path, 'wb'))    # Save as .pickle
         return True
     ################################################################################################################################################    
@@ -183,7 +189,7 @@ class RECORD(object):
         file_path = file_path = records_folder_path + '/' + file_name + '.pickle'
         if os.path.exists(file_path): 
             self.frames = pickle.load(open(file_path, 'rb')) 
-################################################################################################################################################    
+####################################################################################################################################################    
 class MOTION(object):
     ############################################################################################################################################
     def __init__(self, file_name=None):
@@ -237,6 +243,7 @@ class MOTION(object):
 
 
 
+
 ####################################################################################################################################################
 def create_folder(file_path):
     # Create folder if it does not exist
@@ -244,4 +251,9 @@ def create_folder(file_path):
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
 ####################################################################################################################################################
-
+def load_color_Setting(file_name='color_setting_default'):
+    file_path = calibsest_folder_path + '/' + file_name + '.pickle'
+    if os.path.exists(file_path): 
+        return  pickle.load(open(file_path, 'rb')) 
+    return None
+####################################################################################################################################################
