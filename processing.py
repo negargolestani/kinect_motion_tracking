@@ -4,18 +4,22 @@ from utils import*
 ################################################################################################################################################
 if __name__ == '__main__':
 
-    color = 'green'
-    n_markers = 2
-    color_range_filename='color_ranges_default'
-    target = TARGET(color, n_markers=n_markers, color_range_filename=color_range_filename)
+
+    file_name = 'record_04'    
+    motion = MOTION(file_name)
     
 
-    file_name = 'record_02'
-    frames = load_record(file_name)
+    print(np.shape(motion.locations))
 
-    times, markers, _ = target.tarck(frames)
-    # save_markers(times, markers, file_name)
-    
-    times, markers = load_markers(file_name)
+    # center = np.mean(frame_marker, axis=0)
+    # align = np.diff(frame_marker, axis=0)
+    # align = align / ( np.linalg.norm(align) + 1e-12)
+    # print(align)
+
+
+    # for frame_markers in markers:
+        # dist = sqrt(sum((self.center - coil.center)**2))
+        # ang_misalign_deg = acos(np.dot(self.norm, coil.norm))*180/pi
+        # return dist, ang_misalign_deg
 
 

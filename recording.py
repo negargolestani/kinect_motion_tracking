@@ -4,13 +4,11 @@ from utils import*
 ################################################################################################################################################
 if __name__ == '__main__':
 
-    file_name = 'record_02'
+    file_name = 'record_04'
 
     kinect = KINECT()
-    record_frames = kinect.record()
-
-    save_record(record_frames, file_name)
-    # recorded_frames = load_record(file_name)
+    record = kinect.record()
+    record.save(file_name)
     
 ################################################################################################################################################
         

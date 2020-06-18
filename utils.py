@@ -5,6 +5,7 @@ import ctypes
 import os
 import copy
 import sys
+import math
 from datetime import datetime
 from pathlib import Path
 
@@ -16,10 +17,66 @@ delimator = ';'
 datime_format = '%y-%m-%d-%H-%M-%S'
 
 main_directory = str( Path(__file__).parents[1] )
-calibsest_folder_path = main_directory + '/calibration_setting'
-records_folder_path = main_directory + '/records'
-markers_folder_path = main_directory + '/markers'
+records_folder_path = main_directory + '/data/records'
+markers_folder_path = main_directory + '/data/markers'
 
+calibsest_folder_path = main_directory + '/calibration_setting'
+color_range_filename =  'color_ranges_default'
+
+
+
+####################################################################################################################################################
+class KINECT(object):
+    ################################################################################################################################################
+    def __init__(self):
+        self.kinect = PyKinectRuntime.PyKinectRuntime( PyKinectV2.FrameSourceTypes_Depth | PyKinectV2.FrameSourceTypes_Color) 
+    ################################################################################################################################################    
+    def get_camera_space(self, depth_frame):
+        S = self.kinect.color_frame_desc.Height * self.kinect.color_frame_desc.Width
+        L = self.kinect.depth_frame_desc.Height * self.kinect.depth_frame_desc.Width
+        TYPE_CameraSpacePointArray = PyKinectV2._CameraSpacePoint * S
+        color2camera_points = ctypes.cast(TYPE_CameraSpacePointArray(), ctypes.POINTER(PyKinectV2._CameraSpacePoint))        
+        self.kinect._mapper.MapColorFrameToCameraSpace(ctypes.c_uint(L), depth_frame , ctypes.c_uint(S), color2camera_points)
+        pf_csps = ctypes.cast(color2camera_points, ctypes.POINTER(ctypes.c_float))
+        camera_space = np.ctypeslib.as_array(pf_csps, shape=(self.kinect.color_frame_desc.Height, self.kinect.color_frame_desc.Width, 3))
+        return camera_space
+    ################################################################################################################################################    
+    def read(self, full_data=True):
+        while True:
+            if self.kinect.has_new_color_frame() and self.kinect.has_new_depth_frame():                    
+                time = datetime.now()
+                color_frame = self.kinect.get_last_color_frame()
+                depth_frame = self.kinect.get_last_depth_frame()
+                depth_frame_ = self.kinect._depth_frame_data
+
+                color_image = color_frame.reshape((self.kinect.color_frame_desc.Height, self.kinect.color_frame_desc.Width, 4)).astype(np.uint8)
+                depth_image = depth_frame.reshape((self.kinect.depth_frame_desc.Height, self.kinect.depth_frame_desc.Width)).astype(np.uint8)
+
+                if full_data:
+                    camera_space = self.get_camera_space(self.kinect._depth_frame_data)
+                    FRAME(time, color_image, depth_image, camera_space)
+                else:
+                   return FRAME(time, color_image, depth_image, depth_frame_) # return depth_frame_ instead of camera_space for faster recording 
+    ################################################################################################################################################    
+    def record(self):
+        print('Recording is Started')
+        print('Press "Esc" Key to Stop Recording')
+
+        # Recording loop
+        rec = RECORD()
+        while cv2.waitKey(1) != 27: 
+            frame = self.read(full_data=False)
+            frame.show()
+
+            rec.add_value(frame) 
+
+        # Get Camera Space after recording loop
+        for i, frame in enumerate(rec.frames):
+            rec.frames[i].camera_space = self.get_camera_space( frame.camera_space )
+        
+        print('Recording is Finished')        
+        return rec
+####################################################################################################################################################
 
 
 
@@ -85,144 +142,96 @@ class FRAME(object):
             if np.any(np.isinf(camera_point)): camera_point = [np.nan, np.nan, np.nan]
             camera_points.append(camera_point )
         return camera_points
-####################################################################################################################################################
-####################################################################################################################################################
-class KINECT(object):
     ################################################################################################################################################
-    def __init__(self):
-        self.kinect = PyKinectRuntime.PyKinectRuntime( PyKinectV2.FrameSourceTypes_Depth | PyKinectV2.FrameSourceTypes_Color) 
+    def get_markers_location(self, color_range, n_markers):
+        markers_location = list()
+        frame_contours = self.color_2_circle_contours(color_range, n_Contours=n_markers)    
+        for contour in frame_contours:
+            color_points, _ = self.contour_2_color_points(contour)              # Targeted points in color space
+            camera_points = self.color_points_2_camera_points(color_points)     # Targeted points in camera space
+            marker_location = np.nanmean(camera_points, axis=0)                 # Average of targeted points in camera space -> Markers center
+            markers_location.append( marker_location )
+        return markers_location
+####################################################################################################################################################
+class RECORD(object):
     ################################################################################################################################################    
-    def get_camera_space(self, depth_frame):
-        S = self.kinect.color_frame_desc.Height * self.kinect.color_frame_desc.Width
-        L = self.kinect.depth_frame_desc.Height * self.kinect.depth_frame_desc.Width
-        TYPE_CameraSpacePointArray = PyKinectV2._CameraSpacePoint * S
-        color2camera_points = ctypes.cast(TYPE_CameraSpacePointArray(), ctypes.POINTER(PyKinectV2._CameraSpacePoint))        
-        self.kinect._mapper.MapColorFrameToCameraSpace(ctypes.c_uint(L), depth_frame , ctypes.c_uint(S), color2camera_points)
-        pf_csps = ctypes.cast(color2camera_points, ctypes.POINTER(ctypes.c_float))
-        camera_space = np.ctypeslib.as_array(pf_csps, shape=(self.kinect.color_frame_desc.Height, self.kinect.color_frame_desc.Width, 3))
-        return camera_space
+    def __init__(self, file_name=None):
+        self.frames = list()  
+        if file_name is not None: self.load(file_name)                   
     ################################################################################################################################################    
-    def read(self, full_data=True):
-        while True:
-            if self.kinect.has_new_color_frame() and self.kinect.has_new_depth_frame():                    
-                time = datetime.now()
-                color_frame = self.kinect.get_last_color_frame()
-                depth_frame = self.kinect.get_last_depth_frame()
-                depth_frame_ = self.kinect._depth_frame_data
-
-                color_image = color_frame.reshape((self.kinect.color_frame_desc.Height, self.kinect.color_frame_desc.Width, 4)).astype(np.uint8)
-                depth_image = depth_frame.reshape((self.kinect.depth_frame_desc.Height, self.kinect.depth_frame_desc.Width)).astype(np.uint8)
-
-                if full_data:
-                    camera_space = self.get_camera_space(self.kinect._depth_frame_data)
-                    FRAME(time, color_image, depth_image, camera_space)
-                else:
-                   return FRAME(time, color_image, depth_image, depth_frame_) # return depth_frame_ instead of camera_space for faster recording 
+    def set_value(self, frames):
+        self.frames = frames
     ################################################################################################################################################    
-    def record(self):
-        print('Recording is Started')
-        print('Press "Esc" Key to Stop Recording')
-
-        # Recording loop
-        frames = list()
-        while cv2.waitKey(1) != 27: 
-            frame = self.read(full_data=False) 
-            frames.append(frame)            
-            frame.show()
-
-        # Get Camera Space after recording loop
-        for i, frame in enumerate(frames):
-            frames[i].camera_space = self.get_camera_space( frame.camera_space )
-        
-        print('Recording is Finished')        
-        return frames
-####################################################################################################################################################
-####################################################################################################################################################
-def save_record(record, file_name):
-    file_path = file_path = records_folder_path + '/' + file_name + '.pickle'
-    create_folder(file_path) # Create folder if it does not exist    
-    pickle.dump( record, open(file_path, 'wb')) # Save as .pickle
-    return
-####################################################################################################################################################
-def load_record(file_name):
-    file_path = file_path = records_folder_path + '/' + file_name + '.pickle'
-    if os.path.exists(file_path):
-        return pickle.load(open(file_path, 'rb'))  
-    return None
-####################################################################################################################################################
-
-
-
-
-####################################################################################################################################################
-class TARGET(object):
+    def add_value(self, frame):
+        self.frames.append(frame)
     ################################################################################################################################################    
-    def __init__(self, color, n_markers=2, color_range_filename='color_range_filename'):
-        self.color_range = get_color_range(color, color_range_filename=color_range_filename)
-        self.n_markers = n_markers
-    ################################################################################################################################################
-    def tarck(self, frames): 
-        frames_ = frames.copy()
-        if type(frames_) is not list: frames_ = [frames]
+    def get_makers_motion(self, color_range, n_markers=2):    
+        motion = MOTION()
+        for frame in self.frames:
+            time = frame.time
+            locations = frame.get_markers_location(color_range, n_markers) 
+            motion.add_value( frame.time, locations)
+        return motion
+    ################################################################################################################################################    
+    def save(self, file_name):
+        file_path = file_path = records_folder_path + '/' + file_name + '.pickle'
+        create_folder(file_path)                            # Create folder if it does not exist    
+        pickle.dump( self.frames, open(file_path, 'wb'))    # Save as .pickle
+        return True
+    ################################################################################################################################################    
+    def load(self, file_name):
+        file_path = file_path = records_folder_path + '/' + file_name + '.pickle'
+        if os.path.exists(file_path): 
+            self.frames = pickle.load(open(file_path, 'rb')) 
+################################################################################################################################################    
+class MOTION(object):
+    ############################################################################################################################################
+    def __init__(self, file_name=None):
+        self.locations = list()        
+        self.times = list()
+        if file_name is not None: self.load(file_name)
+    ############################################################################################################################################
+    def set_value(self, times, locations):
+        self.times = times
+        self.locations = locations
+    ############################################################################################################################################
+    def add_value(self, time, locations):
+        self.times.append(time)
+        self.locations.append(locations)
+    ############################################################################################################################################
+    def save(self, file_name):
+        # Save markers' center  (camera space) as "txt" file 
+        file_path = markers_folder_path + '/' + file_name + '.txt'
+        create_folder(file_path)                                    # Create folder if it does not exist    
 
-        times, markers, contours = list(), list(), list()        
-        for frame in frames_:
-            frame_markers = list()
-            frame_contours = frame.color_2_circle_contours(self.color_range, n_Contours=self.n_markers)    
-            for contour in frame_contours:
-                color_points, _ = frame.contour_2_color_points(contour)              # Targeted points in color space
-                camera_points = frame.color_points_2_camera_points(color_points)     # Targeted points in camera space
-                camera_center = np.nanmean(camera_points, axis=0)                    # Average of targeted points in camera space -> Markers center
-                frame_markers.append( camera_center )
+        # Markers (txt)
+        data_txt = ''
+        for i in range(len(self.times)):  
+            data_txt += self.times[i].strftime( datime_format )                    # Markers (txt)
+            for m in np.array(self.locations[i]).flatten(): 
+                data_txt +=  delimator + str(m)  
+            data_txt += '\n'
 
-            times.append( frame.time )
-            markers.append( frame_markers )
-            contours.append( frame_contours )
+        # Save 
+        with open(file_path, 'w') as f:
+            f.write( data_txt )   
+            
+        return
+    ############################################################################################################################################
+    def load(self, file_name):
+        file_path = markers_folder_path + '/' + file_name + '.txt'
+        if os.path.exists(file_path):
+            with open(file_path , 'r') as f:
+                lines = f.read().splitlines() 
 
-        return times, markers, contours
+            self.times, self.locations = list(), list()
+            for line in lines:
+                data_txt = line.split( delimator )
+                frame_time = datetime.strptime(data_txt[0], datime_format )
+                frame_markers_location = np.array( [ float(x) for x in data_txt[1:]] ).reshape((-1,3))        
+                self.times.append(frame_time)
+                self.locations.append( frame_markers_location )
 ####################################################################################################################################################
-####################################################################################################################################################
-def save_markers(times, markers, file_name):
-    # Save markers' center  (camera space) as "txt" file 
-    file_path = markers_folder_path + '/' + file_name + '.txt'
-
-    # Header (txt)
-    # data_txt = 'Time' 
-    # for i in ['x', 'y', 'z']: 
-    #     data_txt += delimator + i + 'Marker_n' 
-    # data_txt += '\n'
-
-    # Markers (txt)
-    data_txt = ''
-    for i in range(len(times)):  
-        data_txt += times[i].strftime( datime_format )                    # Markers (txt)
-        for m in np.array(markers[i]).flatten(): 
-            data_txt +=  delimator + str(m)  
-        data_txt += '\n'
-
-    # Save 
-    with open(file_path, 'w') as f:
-        f.write( data_txt )   
-        
-    return
-####################################################################################################################################################
-def load_markers(file_name):
-    file_path = markers_folder_path + '/' + file_name + '.txt'
-    
-    with open(file_path , 'r') as f:
-        lines = f.read().splitlines() 
-
-    times, markers = list(), list()
-    for line in lines:
-        data_txt = line.split( delimator )
-        frame_time = datetime.strptime(data_txt[0], datime_format )
-        frame_markers = np.array( [ float(x) for x in data_txt[1:]] ).reshape((-1,3))        
-        times.append(frame_time)
-        markers.append( frame_markers )
-
-    return times, markers
-####################################################################################################################################################
-
 
 
 
@@ -235,11 +244,4 @@ def create_folder(file_path):
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
 ####################################################################################################################################################
-def get_color_range(color, color_range_filename='color_ranges_default'):
-    file_path = calibsest_folder_path + '/' + color_range_filename + '.pickle'
-    color_ranges = pickle.load( open(file_path, 'rb') )  
-    return color_ranges[color]
-####################################################################################################################################################
-
-
 
