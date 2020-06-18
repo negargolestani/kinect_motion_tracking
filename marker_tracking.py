@@ -11,16 +11,11 @@ if __name__ == '__main__':
     record = RECORD( file_name )
     
  
-    color = 'purple'
+    color = 'green'
     color_range = color_setting[color]  
-
-
-    for frame in record.frames:
-        contours = frame.color_2_circle_contours(color_range, n_Contours=2)  
-        frame.show(contours=contours, wait=1000)  
    
-    # motion = record.get_makers_motion(color_range,n_markers=2)
-    # motion.save(file_name)
+    motion = record.get_makers_motion(color_range,n_markers=2, show=False)
+    motion.save(file_name + '_' + color)
     
 
 
