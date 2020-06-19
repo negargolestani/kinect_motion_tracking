@@ -29,9 +29,15 @@ def get_color_setting(image_name, color_names):
 
     # Get gray and hsv image
     n_colors = len( color_names)
+
     image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     image_hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
+
+    # image_rgb = cv2.cvtColor(image, cv2.COLOR_BGRA2RGB)
+    # image_gray = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2GRAY)
+    # image_hsv = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2HSV)
+    
     # Find contuors
     contours, _ = cv2.findContours(cv2.inRange(image_gray, 0, 250), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
@@ -58,7 +64,7 @@ def get_color_setting(image_name, color_names):
         image_ = cv2.drawContours(image_,[box], 0, (255,255,255), -1)            
         pixels = np.where(cv2.cvtColor(image_, cv2.COLOR_RGB2GRAY))
         hsv_pixels = image_hsv[pixels]
-        color_range = get_color_range(hsv_pixels)
+        color_range = get_color_range(hsv_pixels, perc_th=0.01)
         color_setting.update({ color_names[i]: color_range })
 
         cv2.imshow( color_names[i], cv2.bitwise_and(image, image_) )
