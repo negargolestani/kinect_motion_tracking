@@ -1,4 +1,3 @@
-import numpy as np
 import cv2
 import pickle
 import ctypes
@@ -6,9 +5,12 @@ import os
 import copy
 import sys
 import math
-from datetime import datetime
-from pathlib import Path
+import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
+from pathlib import Path
+from datetime import datetime
+
 
 from pykinect2 import PyKinectV2
 from pykinect2.PyKinectV2 import *
@@ -165,6 +167,22 @@ class MARKERSET(object):
 
         return motion, times
 ####################################################################################################################################################
+####################################################################################################################################################
+class COIL(object):
+    # Defines coil by 3 marker
+    def __init__(self, markers_motion):
+        v1 = markers_motion[:,0,:] - markers_motion[:,1,:]
+        v2 = markers_motion[:,0,:] - markers_motion[:,2,:]
+        norm = np.cross(v1, v2)
+        self.norm = norm / ( np.linalg.norm(norm) + 1e-12)
+        self.center = np.mean( markers_motion, axis=1)
+    ################################################################################################################################################
+    def get_relative_motion(self, coil):
+        dictance = math.sqrt(sum((self.center - coil.center)**2))
+        ang_misalign_deg = math.acos(np.dot(self.norm, coil.norm))*180/math.pi
+        return dictance, ang_misalign_deg
+    ################################################################################################################################################
+####################################################################################################################################################
 
 
 
@@ -219,8 +237,8 @@ def save_markers(markers_motion, file_name):
     file_path = markers_folder_path + '/' + file_name + '.txt'
     create_folder(file_path)                                    # Create folder if it does not exist    
     
-    motion_ = np.array(markers_motion)
-    motion = motion_.reshape(-1, motion.shape[1]*motion.shape[2])
+    motion = np.array(markers_motion)
+    motion = motion.reshape(-1, motion.shape[1] * motion.shape[2])
     np.savetxt(file_path, motion, delimiter=delimiter, fmt='%s')
 
     return
@@ -231,7 +249,6 @@ def load_markers(file_name):
         markers_motion = np.loadtxt(file_path, delimiter=delimiter)
         return markers_motion.reshape(markers_motion.shape[0], -1, 3 )
 ####################################################################################################################################################
-
 
 
 ####################################################################################################################################################
