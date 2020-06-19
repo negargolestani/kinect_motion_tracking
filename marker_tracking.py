@@ -13,7 +13,6 @@ if __name__ == '__main__':
     color = 'green'
     markerset = MARKERSET( color, n_markers, marker_radius, color_setting_filename)
     
-    
     file_name = 'record_04'
     record = load_record( file_name )
     
