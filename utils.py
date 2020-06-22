@@ -115,7 +115,7 @@ class KINECT(object):
                 else:
                    return FRAME(time, color_image, depth_image, depth_frame_) # return depth_frame_ instead of camera_space for faster recording 
     ################################################################################################################################################    
-    def record(self):
+    def record(self, full_data=True):
         print('Recording is Started')
         print('Press "Esc" Key to Stop Recording')
 
@@ -131,8 +131,9 @@ class KINECT(object):
         print('Wait for Processing ...')        
 
         # Get Camera Space after recording loop
-        for i, frame in enumerate(record):
-            record[i].camera_space = self.get_camera_space( frame.camera_space )
+        if full_data:
+           for i, frame in enumerate(record):
+                record[i].camera_space = self.get_camera_space( frame.camera_space )
         
         print('Done!')        
         return record

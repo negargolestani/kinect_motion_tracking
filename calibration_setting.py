@@ -83,11 +83,16 @@ def save_color_setting(color_setting, file_name):
 ####################################################################################################################################################
 if __name__ == '__main__':
 
-    image_name = 'color_setting_ref'                                                            # png file name (input: reference image)
-    color_names = ['yellow', 'red', 'green', 'blue', 'purple', 'orange']                        # color names from left to right of image (input)
-    color_range_file_name = 'color_setting_default'                                             # pickle file name (saved output: color ranges)
+    # image_name = 'color_setting_ref'                                                            # png file name (input: reference image)
+    # color_names = ['yellow', 'red', 'green', 'blue', 'purple', 'orange']                        # color names from left to right of image (input)
+    # color_range_file_name = 'color_setting_default'                                             # pickle file name (saved output: color ranges)
         
-        
+
+    image_name = 'color_setting_ref2'                                                            # png file name (input: reference image)
+    color_names = ['blue', 'orange']                        # color names from left to right of image (input)
+    color_range_file_name = 'color_setting_default2'                                             # pickle file name (saved output: color ranges)
+
+
     # get_image( image_name)                                                                      # Get Image
     color_setting = get_color_setting( image_name,  color_names )  # get dict() of color ranges
     save_color_setting( color_setting, color_range_file_name )    
