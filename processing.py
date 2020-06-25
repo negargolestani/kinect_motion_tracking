@@ -6,7 +6,7 @@ if __name__ == '__main__':
 
 
     # file_name = 'record_04_green'    
-    file_name = 'record_05'    
+    file_name = 'record_01'    
     markers_motion = load_markers(file_name + '_blue')
     times = load_times(file_name)
 

@@ -88,9 +88,9 @@ if __name__ == '__main__':
     # color_range_file_name = 'color_setting_default'                                             # pickle file name (saved output: color ranges)
         
 
-    image_name = 'color_setting_ref2'                                                            # png file name (input: reference image)
-    color_names = ['blue', 'orange']                        # color names from left to right of image (input)
-    color_range_file_name = 'color_setting_default2'                                             # pickle file name (saved output: color ranges)
+    image_name = 'color_setting_br'                                                            # png file name (input: reference image)
+    color_names = ['blue','red']                        # color names from left to right of image (input)
+    color_range_file_name = 'color_setting_br'                                             # pickle file name (saved output: color ranges)
 
 
     # get_image( image_name)                                                                      # Get Image

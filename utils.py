@@ -5,6 +5,7 @@ import os
 import copy
 import sys
 import math
+import win32api
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
@@ -54,6 +55,7 @@ class FRAME(object):
         # Filter color      
         hsv = cv2.cvtColor(self.color_image , cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, color_range[0], color_range[1])
+        mask = cv2.medianBlur(mask,	5)
 
         # Cluster pixels to n_markers 
         markers_pixels = np.array(np.where(mask)).transpose().tolist()          # find pixels with targeted color 
@@ -67,6 +69,24 @@ class FRAME(object):
 
         # Find contours of circles
         circles , _ = cv2.findContours(mask, cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+
+        return circles
+    ################################################################################################################################################
+    def get_colored_circle_(self, color_range, n_circles, minDist=20, param1=100, param2=10, minRadius=10, maxRadius=20):  
+       # Filter color      
+        hsv = cv2.cvtColor(self.color_image , cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, color_range[0], color_range[1])
+        mask = cv2.medianBlur(mask,	5)
+        
+        # Circles center
+        circles	= cv2.HoughCircles(mask, cv2.HOUGH_GRADIENT, 1, minDist=minDist, param1=param1, param2=param2, minRadius=minRadius, maxRadius=maxRadius)
+        circles	= np.uint16(np.around(circles))
+
+        mask = np.zeros_like(mask)
+        for	circ in circles[0,:]:
+            cv2.circle(mask, (circ[0],circ[1]), circ[2], 255, -1)
+            
+        circles , _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         return circles
     ################################################################################################################################################
@@ -121,7 +141,7 @@ class KINECT(object):
 
         # Recording loop
         record = list()
-        while cv2.waitKey(1) != 27: 
+        while cv2.waitKey(1) != 27 and win32api.GetKeyState(0x01)>-1: 
             frame = self.read(full_data=False)
             frame.show()
 
