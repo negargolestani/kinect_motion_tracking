@@ -9,8 +9,9 @@ if __name__ == '__main__':
 
     exp = EXPERIMENT(file_name, reader_color='blue', tags_color='red')
     distance_list, ang_misalign_list = exp.status()
+        
+   
 
-    
     plt.figure()
     plt.plot( distance_list[0] )
     plt.figure()
