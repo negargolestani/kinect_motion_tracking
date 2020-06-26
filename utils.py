@@ -4,7 +4,6 @@ import ctypes
 import os
 import copy
 import sys
-import math
 import win32api
 import numpy as np
 import matplotlib.pyplot as plt
@@ -105,8 +104,12 @@ class FRAME(object):
 ####################################################################################################################################################
 class KINECT(object):
     ################################################################################################################################################
-    def __init__(self):
+    def __init__(self, top_margin=0.1, bottom_margin=0.1, left_margin=0.1, right_margin=0.1):
         self.kinect = PyKinectRuntime.PyKinectRuntime( PyKinectV2.FrameSourceTypes_Depth | PyKinectV2.FrameSourceTypes_Color) 
+        
+        ch, cw = self.kinect.color_frame_desc.Height, self.kinect.color_frame_desc.Width
+        self.color_mask = np.full((ch, cw), 0, dtype=np.uint8)  
+        self.color_mask[int(top_margin*ch): -int(bottom_margin*ch), int(left_margin*cw):-int(right_margin*cw)] = 1    
     ################################################################################################################################################    
     def get_camera_space(self, depth_frame):
         S = self.kinect.color_frame_desc.Height * self.kinect.color_frame_desc.Width
@@ -128,6 +131,9 @@ class KINECT(object):
 
                 color_image = color_frame.reshape((self.kinect.color_frame_desc.Height, self.kinect.color_frame_desc.Width, 4)).astype(np.uint8)
                 depth_image = depth_frame.reshape((self.kinect.depth_frame_desc.Height, self.kinect.depth_frame_desc.Width)).astype(np.uint8)
+
+                color_image = cv2.bitwise_and(color_image, color_image, mask=self.color_mask)
+                # depth_image = cv2.bitwise_and(depth_image, depth_image, mask=self.depth_mask)
 
                 if full_data:
                     camera_space = self.get_camera_space(depth_frame_)
@@ -190,20 +196,46 @@ class MARKERSET(object):
 ####################################################################################################################################################
 ####################################################################################################################################################
 class COIL(object):
-    # Defines coil by 3 marker
-    def __init__(self, markers_motion):
-        v1 = markers_motion[:,0,:] - markers_motion[:,1,:]
-        v2 = markers_motion[:,0,:] - markers_motion[:,2,:]
+    ################################################################################################################################################
+    def __init__(self, file_name):
+        cleaned_markers_motion = self.get_clean_data(file_name)
+        v1 = cleaned_markers_motion[:,0,:] - cleaned_markers_motion[:,1,:]
+        v2 = cleaned_markers_motion[:,0,:] - cleaned_markers_motion[:,2,:]
         norm = np.cross(v1, v2)
         self.norm = norm / ( np.linalg.norm(norm) + 1e-12)
-        self.center = np.mean( markers_motion, axis=1)
+        self.center = np.mean( cleaned_markers_motion, axis=1)     
+    ################################################################################################################################################
+    def get_clean_data(self, file_name):
+        markers_motion = load_markers( file_name )
+        return markers_motion
     ################################################################################################################################################
     def get_relative_motion(self, coil):
-        dictance = math.sqrt(sum((self.center - coil.center)**2))
-        ang_misalign_deg = math.acos(np.dot(self.norm, coil.norm))*180/math.pi
-        return dictance, ang_misalign_deg
-    ################################################################################################################################################
+        distance = np.sqrt(sum((self.center - coil.center)**2))
+        ang_misalign = np.arccos(np.sum(np.multiply(self.norm, coil.norm), axis=1)) * 180/np.pi
+        return distance, ang_misalign
 ####################################################################################################################################################
+####################################################################################################################################################
+class EXPERIMENT(object):
+    # Defines coil by 3 marker
+    def __init__(self, file_name, reader_color=None, tags_color=None):
+        self.times = load_times(file_name)
+        self.reader = COIL(file_name + '_' + reader_color)        
+        self.tags = list()
+        tags_color_ = tags_color
+        if type(tags_color) is not list: tags_color_ = [tags_color]
+        for tag_color in tags_color_: self.tags.append( COIL(file_name + '_' + tag_color)   )
+        
+        return
+    ################################################################################################################################################
+    def status(self):
+        distance_list, ang_misalign_list = list(), list()
+        for tag in self.tags:
+            distance, ang_misalign = self.reader.get_relative_motion(tag)
+            distance_list.append(distance)
+            ang_misalign_list.append(ang_misalign)
+        return distance_list, ang_misalign_list
+####################################################################################################################################################
+
 
 
 ####################################################################################################################################################    

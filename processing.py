@@ -5,14 +5,20 @@ from utils import*
 if __name__ == '__main__':
 
 
-    # file_name = 'record_04_green'    
-    file_name = 'record_01'    
-    markers_motion = load_markers(file_name + '_blue')
-    times = load_times(file_name)
+    file_name = 'record_02'    
 
-    coil = COIL(markers_motion)
+    motion = load_markers(file_name + 'red')
 
-    plt.plot( coil.center )
+    # exp = EXPERIMENT(file_name, reader_color='blue', tags_color='red')
+
+    # distance_list, ang_misalign_list = exp.status()
+
+    # plt.figure()
+    # plt.plot( ang_misalign_list[0] )
+
+    # plt.figure()
+    # plt.plot( distance_list[0] )
+
     plt.show()
 
 
