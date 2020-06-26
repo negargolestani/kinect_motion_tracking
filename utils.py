@@ -6,11 +6,12 @@ import copy
 import sys
 import win32api
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from pathlib import Path
 from datetime import datetime
-
+from scipy import signal
 
 from pykinect2 import PyKinectV2
 from pykinect2.PyKinectV2 import *
@@ -24,7 +25,6 @@ markers_folder_path = main_directory + '/data/markers'
 times_folder_path = main_directory + '/data/times'
 
 datime_format = '%y-%m-%d-%H-%M-%S'
-delimiter = ';'
 
 
 
@@ -190,27 +190,53 @@ class MARKERSET(object):
             locations = frame.get_location(frame_circles)
             motion.append( locations )
             times.append(frame.time)
-            if show: frame.show(contours=frame_circles, wait=500)
+            if show: frame.show(contours=frame_circles, wait=1)
 
         return motion, times
 ####################################################################################################################################################
 ####################################################################################################################################################
 class COIL(object):
+    n_marker = 3
     ################################################################################################################################################
     def __init__(self, file_name):
-        cleaned_markers_motion = self.get_clean_data(file_name)
-        v1 = cleaned_markers_motion[:,0,:] - cleaned_markers_motion[:,1,:]
-        v2 = cleaned_markers_motion[:,0,:] - cleaned_markers_motion[:,2,:]
+        self.load_data( file_name)
+        self.clean_data()
+        self.filter_data()
+        self.get_params()
+    ################################################################################################################################################    
+    def load_data(self, file_name):
+        markers_motion_mtx = load_motion( file_name )
+        self.markers_motion = list()    
+        for i in range(self.n_marker):
+            self.markers_motion.append( markers_motion_mtx[:,i*3:(i+1)*3] )    
+        return 
+    ################################################################################################################################################
+    def clean_data(self):
+        # This function gets motion of markers and handles NAN values    
+        cleaned_markers_motion = self.markers_motion.copy()    
+        for i, motion in enumerate(cleaned_markers_motion):
+            if np.any(np.isnan(motion)):
+                df = pd.DataFrame(motion)
+                df.fillna(method='ffill', axis=0, inplace=True)                
+                cleaned_markers_motion[i] = df.to_numpy()        
+        self.markers_motion = cleaned_markers_motion
+    ################################################################################################################################################
+    def filter_data(self, window_length=11, polyorder=1):
+        filtered_markers_motion = self.markers_motion.copy()    
+        for i, marker in enumerate(filtered_markers_motion):
+            for j in range(3): 
+                filtered_markers_motion[i][:,j] = signal.savgol_filter( marker[:,j], window_length=window_length, polyorder=polyorder)  
+        self.markers_motion = filtered_markers_motion        
+    ################################################################################################################################################        
+    def get_params(self):    
+        v1 = self.markers_motion[0] - self.markers_motion[1]
+        v2 = self.markers_motion[0] - self.markers_motion[2]
         norm = np.cross(v1, v2)
         self.norm = norm / ( np.linalg.norm(norm) + 1e-12)
-        self.center = np.mean( cleaned_markers_motion, axis=1)     
-    ################################################################################################################################################
-    def get_clean_data(self, file_name):
-        markers_motion = load_markers( file_name )
-        return markers_motion
+        self.center = np.mean( self.markers_motion, axis=0)     
     ################################################################################################################################################
     def get_relative_motion(self, coil):
-        distance = np.sqrt(sum((self.center - coil.center)**2))
+        distance =  np.linalg.norm( self.center - coil.center, axis=1) 
         ang_misalign = np.arccos(np.sum(np.multiply(self.norm, coil.norm), axis=1)) * 180/np.pi
         return distance, ang_misalign
 ####################################################################################################################################################
@@ -224,7 +250,6 @@ class EXPERIMENT(object):
         tags_color_ = tags_color
         if type(tags_color) is not list: tags_color_ = [tags_color]
         for tag_color in tags_color_: self.tags.append( COIL(file_name + '_' + tag_color)   )
-        
         return
     ################################################################################################################################################
     def status(self):
@@ -282,22 +307,23 @@ def load_times(file_name):
 ####################################################################################################################################################
 
 ####################################################################################################################################################
-def save_markers(markers_motion, file_name):
+def save_motion(motion, file_name):
     # Save markers' center  (camera space) as "txt" file 
     file_path = markers_folder_path + '/' + file_name + '.txt'
     create_folder(file_path)                                    # Create folder if it does not exist    
     
-    motion = np.array(markers_motion)
+    motion = np.array(motion)
     motion = motion.reshape(-1, motion.shape[1] * motion.shape[2])
-    np.savetxt(file_path, motion, delimiter=delimiter, fmt='%s')
+    np.savetxt(file_path, motion, delimiter="\t", fmt='%s')
 
     return
 ####################################################################################################################################################
-def load_markers(file_name):
+def load_motion(file_name):
     file_path = markers_folder_path + '/' + file_name + '.txt'
     if os.path.exists(file_path):
-        markers_motion = np.loadtxt(file_path, delimiter=delimiter)
-        return markers_motion.reshape(markers_motion.shape[0], -1, 3 )
+        markers_motion = np.loadtxt(file_path)
+        # return markers_motion.reshape(markers_motion.shape[0], -1, 3 )
+        return markers_motion
 ####################################################################################################################################################
 
 
