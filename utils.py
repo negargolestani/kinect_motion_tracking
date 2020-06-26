@@ -232,12 +232,12 @@ class COIL(object):
         v1 = self.markers_motion[0] - self.markers_motion[1]
         v2 = self.markers_motion[0] - self.markers_motion[2]
         norm = np.cross(v1, v2)
-        self.norm = norm / ( np.linalg.norm(norm) + 1e-12)
+        self.norm = norm / ( np.reshape(np.linalg.norm(norm, axis=1) + 1e-12, (-1,1)) * np.ones((1,3)) )
         self.center = np.mean( self.markers_motion, axis=0)     
     ################################################################################################################################################
     def get_relative_motion(self, coil):
         distance =  np.linalg.norm( self.center - coil.center, axis=1) 
-        ang_misalign = np.arccos(np.sum(np.multiply(self.norm, coil.norm), axis=1)) * 180/np.pi
+        ang_misalign = np.arccos(np.abs(np.sum(np.multiply(self.norm, coil.norm), axis=1)) ) * 180/np.pi
         return distance, ang_misalign
 ####################################################################################################################################################
 ####################################################################################################################################################
