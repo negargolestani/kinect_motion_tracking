@@ -51,25 +51,27 @@ class KINECT(object):
         
         # Initialization
         time_file_path = get_time_file_path(file_name)
-        video_file_path = get_video_file_path(file_name)
+        color_video_file_path = get_color_video_file_path(file_name)
         camera_space_file_path = get_camera_space_file_path(file_name) 
 
         data_txt = ''
-        color_vid = cv2.VideoWriter(video_file_path, cv2.VideoWriter_fourcc(*'DIVX'), 30.0, (self.kinect.color_frame_desc.Width,self.kinect.color_frame_desc.Height))
+        color_vid = cv2.VideoWriter(color_video_file_path, cv2.VideoWriter_fourcc(*'DIVX'), 30.0, (self.kinect.color_frame_desc.Width,self.kinect.color_frame_desc.Height))
 
         print('Recording is Started')
         print('Press "Esc" Key to Stop Recording')
 
         # Recording loop
         camera_space = list()
-        while cv2.waitKey(1) != 27 and win32api.GetKeyState(0x01)>-1: 
+
+        # start_time = time.time()
+        # while int(time.time()-start_time)<30 and cv2.waitKey(1)!=27:
+        while cv2.waitKey(1) != 27:
+            
             self.read(full=True)
             self.show()
     
             data_txt += self.time.strftime( datime_format )  + '\n'  
-
-            color_vid.write( cv2.cvtColor(self.color_image, cv2.COLOR_RGBA2RGB) )
-            # color_vid.write( self.color_image )
+            color_vid.write( cv2.cvtColor(self.color_image, cv2.COLOR_RGBA2RGB) )            
             camera_space.append(self.camera_space)
 
         print('Recording is Finished')        
@@ -86,13 +88,13 @@ class KINECT(object):
 ################################################################################################################################################
 if __name__ == '__main__':
     
-    file_name='test'
+    file_name='record_02'
 
     kinect = KINECT( 
-        top_margin=0.1, 
-        bottom_margin=0.1, 
-        left_margin=0.15, 
-        right_margin=0.15)            
+        top_margin=0.15, 
+        bottom_margin=0.15, 
+        left_margin=0.2, 
+        right_margin=0.2)            
     kinect.record(file_name)
 ################################################################################################################################################
         

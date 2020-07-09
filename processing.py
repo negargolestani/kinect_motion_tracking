@@ -52,11 +52,10 @@ class COIL(object):
 if __name__ == '__main__':
 
 
-    file_name = 'test'   
+    file_name = 'record_01'   
     reader_color = 'blue'
     tags_color = ['red']
         
-   
     reader = COIL(file_name + '_' + reader_color)    
     for tag_color in tags_color:
         tag =  COIL(file_name + '_' + tag_color)  

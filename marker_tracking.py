@@ -1,5 +1,5 @@
 from utils import*
-from collections import defaultdict
+
 
 ################################################################################################################################################
 class RECORD(object):
@@ -13,7 +13,7 @@ class RECORD(object):
         with open(camera_space_file_path, "rb") as f: 
             self.camera_spaces = pickle.load(f)
 
-        video_file_path = get_video_file_path(file_name)
+        video_file_path = get_color_video_file_path(file_name)
         self.color_vid = cv2.VideoCapture(video_file_path)
 
         self.next_idx = 0 
@@ -86,14 +86,13 @@ class RECORD(object):
             locations = [*locations, *location]
         return locations     
     ############################################################################################################################################
-################################################################################################################################################
 
 
 
 ################################################################################################################################################
 if __name__ == '__main__':
 
-    file_name = 'test'
+    file_name = 'record_01'
     colors = ['red', 'blue'] 
 
     record = RECORD( file_name, color_setting_filename='color_setting_default')
@@ -108,7 +107,7 @@ if __name__ == '__main__':
             cv2.drawContours(record.frame, circles, -1, color=30*i, thickness=3) 
             locations = record.get_locations(circles)              
             motions_dict[color].append(locations)
-        record.show(wait=10)
+        record.show(wait=1)
 
     # Save
     for color, motion in motions_dict.items():
