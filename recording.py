@@ -1,8 +1,9 @@
-from utils import* 
 
 from pykinect2 import PyKinectV2
 from pykinect2.PyKinectV2 import *
 from pykinect2 import PyKinectRuntime
+
+from utils import* 
 
 ####################################################################################################################################################
 class KINECT(object):
@@ -18,7 +19,7 @@ class KINECT(object):
         while True:
             if self.kinect.has_new_color_frame() and self.kinect.has_new_depth_frame():   
 
-                self.time = datetime.now()
+                self.time = datetime.now().time()
                 self.color_frame = self.kinect.get_last_color_frame()
                 self.depth_frame = self.kinect._depth_frame_data
         
@@ -26,6 +27,7 @@ class KINECT(object):
                 self.color_image = cv2.bitwise_and(self.color_image, self.color_image, mask=self.color_mask)
 
                 if full: self.get_camera_space()
+
                 break        
     ################################################################################################################################################         
     def get_camera_space(self):
@@ -54,30 +56,40 @@ class KINECT(object):
         color_video_file_path = get_color_video_file_path(file_name)
         camera_space_file_path = get_camera_space_file_path(file_name) 
 
-        data_txt = ''
+        time_txt = ''
         color_vid = cv2.VideoWriter(color_video_file_path, cv2.VideoWriter_fourcc(*'DIVX'), 30.0, (self.kinect.color_frame_desc.Width,self.kinect.color_frame_desc.Height))
+
+        
+        # shoen when kinect starts recording
+        self.read(full=False)
+        cv2.waitKey(1000)
 
         print('Recording is Started')
         print('Press "Esc" Key to Stop Recording')
 
         # Recording loop
+        # Nframes = 400
         camera_space = list()
 
         # start_time = time.time()
-        # while int(time.time()-start_time)<30 and cv2.waitKey(1)!=27:
-        while cv2.waitKey(1) != 27:
+        # while int(time.time()-start_time)<20 and cv2.waitKey(1)!=27:
+        while cv2.waitKey(1)!=27:
             
             self.read(full=True)
             self.show()
-    
-            data_txt += self.time.strftime( datime_format )  + '\n'  
+
+            # Nframes -=1
+            # print(Nframes)
+
+            time_txt += self.time.strftime( datime_format )  + '\n'  
             color_vid.write( cv2.cvtColor(self.color_image, cv2.COLOR_RGBA2RGB) )            
             camera_space.append(self.camera_space)
 
+        cv2.destroyAllWindows()
         print('Recording is Finished')        
         print('Wait for Processing ...')        
 
-        with open(time_file_path, 'w') as f: f.write( data_txt)   
+        with open(time_file_path, 'w') as f: f.write( time_txt)   
         with open(camera_space_file_path,"wb") as f: pickle.dump(camera_space, f)            
         
         print('Done!')
@@ -88,7 +100,7 @@ class KINECT(object):
 ################################################################################################################################################
 if __name__ == '__main__':
     
-    file_name='record_02'
+    file_name='record_07'
 
     kinect = KINECT( 
         top_margin=0.15, 

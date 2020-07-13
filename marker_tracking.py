@@ -26,11 +26,14 @@ class RECORD(object):
             self.next_idx += 1        
             return True
         return False      
-    ################################################################################################################################################
-    def drwa_contours(self, contours, color):
-        cv2.drawContours(frame, contours, -1, color=color, thickness=3) 
+    ############################################################################################################################################
+    def draw_contours(self, contours, color):
+        cnts = list()
+        for contour in contours:
+            if len(contour): cnts.append(contour)
+        cv2.drawContours(self.frame, cnts, -1, color=color, thickness=3) 
         return
-    ################################################################################################################################################
+    ############################################################################################################################################
     def show(self, contours=None, wait=None):
         if self.frame is not None:
             if contours is not None: cv2.drawContours(self.frame, contours, -1, color=(255,255,0), thickness=3) 
@@ -64,6 +67,7 @@ class RECORD(object):
 
         # Find contours of circles
         circles , _ = cv2.findContours(mask, cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+        while len(circles)<n_circles: circles.append( [] )
 
         return circles
     ############################################################################################################################################
@@ -76,13 +80,16 @@ class RECORD(object):
     def get_locations(self, contours):
         locations = list()
         for contour in contours:
-            pixels = self.get_pixels(contour) 
-            camera_points = list()
-            for pixel in pixels: 
-                camera_point = self.camera_space[pixel[0], pixel[1]]
-                if np.any(np.isinf(camera_point)): camera_point = [np.nan, np.nan, np.nan]
-                camera_points.append( camera_point ) 
-            location = np.nanmean(camera_points, axis=0) 
+            if len(contour):               
+                pixels = self.get_pixels(contour) 
+                camera_points = list()
+                for pixel in pixels: 
+                    camera_point = self.camera_space[pixel[0], pixel[1]]
+                    if np.any(np.isinf(camera_point)): camera_point = [np.nan, np.nan, np.nan]
+                    camera_points.append( camera_point ) 
+                location = np.nanmean(camera_points, axis=0) 
+            else:
+                 location = [np.nan, np.nan, np.nan]
             locations = [*locations, *location]
         return locations     
     ############################################################################################################################################
@@ -92,8 +99,8 @@ class RECORD(object):
 ################################################################################################################################################
 if __name__ == '__main__':
 
-    file_name = 'record_01'
-    colors = ['red', 'blue'] 
+    file_name = 'record_06'
+    colors = ['red','blue','green'] 
 
     record = RECORD( file_name, color_setting_filename='color_setting_default')
     motions_dict = defaultdict(list)
@@ -104,15 +111,14 @@ if __name__ == '__main__':
 
         for i, color in enumerate(colors):
             circles = record.get_colored_circles(color, n_circles=3) 
-            cv2.drawContours(record.frame, circles, -1, color=30*i, thickness=3) 
+            record.draw_contours(circles, color=30*i) 
             locations = record.get_locations(circles)              
             motions_dict[color].append(locations)
         record.show(wait=1)
 
     # Save
-    for color, motion in motions_dict.items():
+    for color, motion in motions_dict.items():        
         motion_file_path = get_motion_file_path(file_name + '_' + color)
-        np.savetxt(motion_file_path, np.array(motion), delimiter="\t", fmt='%s')
-        
+        np.savetxt(motion_file_path, np.array(motion), delimiter="\t", fmt='%s')        
 ################################################################################################################################################    
     

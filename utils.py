@@ -16,14 +16,14 @@ import glob
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from pathlib import Path
-from datetime import datetime
-from scipy import signal
+from datetime import datetime, date, time
+from scipy import signal, interpolate
 from collections import defaultdict
 
 
-
 main_directory = str( Path(__file__).parents[1] )
-datime_format = '%y-%m-%d-%H-%M-%S-%f'
+# datime_format = '%y-%m-%d-%H-%M-%S-%f'
+datime_format = '%H:%M:%S.%f'
 
 
 ####################################################################################################################################################
@@ -44,6 +44,9 @@ def get_rssi_file_path(file_name):
 ####################################################################################################################################################
 def get_color_setting_file_path(file_name):
     return main_directory + '/data/kinect/calibration_setting/' + file_name + '.pickle'
+####################################################################################################################################################
+def get_color_image_file_path(file_name):
+    return main_directory + '/data/kinect/calibration_setting/' + file_name + '.png'
 ####################################################################################################################################################
 
 
