@@ -60,26 +60,18 @@ class KINECT(object):
         color_vid = cv2.VideoWriter(color_video_file_path, cv2.VideoWriter_fourcc(*'DIVX'), 30.0, (self.kinect.color_frame_desc.Width,self.kinect.color_frame_desc.Height))
 
         
-        # shoen when kinect starts recording
+        # show when kinect starts recording
         self.read(full=False)
-        cv2.waitKey(1000)
-
         print('Recording is Started')
         print('Press "Esc" Key to Stop Recording')
 
         # Recording loop
-        # Nframes = 400
         camera_space = list()
-
-        # start_time = time.time()
-        # while int(time.time()-start_time)<20 and cv2.waitKey(1)!=27:
-        while cv2.waitKey(1)!=27:
+        start_time = time_.time()
+        while int(time_.time()-start_time)<35 and cv2.waitKey(1)!=27:
             
             self.read(full=True)
             self.show()
-
-            # Nframes -=1
-            # print(Nframes)
 
             time_txt += self.time.strftime( datime_format )  + '\n'  
             color_vid.write( cv2.cvtColor(self.color_image, cv2.COLOR_RGBA2RGB) )            
@@ -99,8 +91,7 @@ class KINECT(object):
 
 ################################################################################################################################################
 if __name__ == '__main__':
-    
-    file_name='record_07'
+    file_name='record_10'
 
     kinect = KINECT( 
         top_margin=0.15, 

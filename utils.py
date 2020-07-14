@@ -10,7 +10,7 @@ import pandas as pd
 import itertools
 import imutils
 import json
-import time
+import time as time_
 import csv
 import glob
 import matplotlib.pyplot as plt
@@ -50,21 +50,6 @@ def get_color_image_file_path(file_name):
 ####################################################################################################################################################
 
 
-
-####################################################################################################################################################
-def load_times(file_name):
-    time_file_path = get_time_file_path(file_name)
-    
-    if os.path.exists(time_file_path):
-        with open(time_file_path , 'r') as f: 
-            lines = f.read().splitlines() 
-
-        times = list()
-        for line in lines: 
-            times.append( datetime.strptime(line, datime_format) )
-        
-        return times
-    return None
 ####################################################################################################################################################
 def create_folder(file_path):
     # Create folder if it does not exist

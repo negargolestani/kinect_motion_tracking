@@ -99,26 +99,28 @@ class RECORD(object):
 ################################################################################################################################################
 if __name__ == '__main__':
 
-    file_name = 'record_06'
     colors = ['red','blue','green'] 
 
-    record = RECORD( file_name, color_setting_filename='color_setting_default')
-    motions_dict = defaultdict(list)
-    
-    while True:
-        success = record.read()
-        if not success: break
+    for n in range(6,10):
+        file_name = 'record_' + "{0:0=2d}".format(n)
 
-        for i, color in enumerate(colors):
-            circles = record.get_colored_circles(color, n_circles=3) 
-            record.draw_contours(circles, color=30*i) 
-            locations = record.get_locations(circles)              
-            motions_dict[color].append(locations)
-        record.show(wait=1)
+        record = RECORD( file_name, color_setting_filename='color_setting_default')
+        motions_dict = defaultdict(list)
+        
+        while True:
+            success = record.read()
+            if not success: break
 
-    # Save
-    for color, motion in motions_dict.items():        
-        motion_file_path = get_motion_file_path(file_name + '_' + color)
-        np.savetxt(motion_file_path, np.array(motion), delimiter="\t", fmt='%s')        
+            for i, color in enumerate(colors):
+                circles = record.get_colored_circles(color, n_circles=3) 
+                record.draw_contours(circles, color=30*i) 
+                locations = record.get_locations(circles)              
+                motions_dict[color].append(locations)
+            record.show(wait=1)
+
+        # Save
+        for color, motion in motions_dict.items():        
+            motion_file_path = get_motion_file_path(file_name + '_' + color)
+            np.savetxt(motion_file_path, np.array(motion), delimiter="\t", fmt='%s')        
 ################################################################################################################################################    
     
