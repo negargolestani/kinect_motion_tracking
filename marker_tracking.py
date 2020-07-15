@@ -1,6 +1,7 @@
 from utils import*
 
 
+
 ################################################################################################################################################
 class RECORD(object):
 ################################################################################################################################################    
@@ -51,23 +52,32 @@ class RECORD(object):
         mask = cv2.inRange(hsv, color_range[0], color_range[1])
         mask = cv2.erode(mask, None, iterations=2)
         mask = cv2.dilate(mask, None, iterations=2)
+        
+        pixels = np.transpose(np.nonzero(mask)) 
+        circles = [[]]*n_circles
 
-        contours = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        contours = imutils.grab_contours(contours)
-        contours = sorted(contours, key=cv2.contourArea, reverse=True)
-        contours = contours[:n_circles]
+        if len(pixels) > n_circles: 
 
-        # only proceed if at least one contour was found
-        mask = np.zeros_like(mask)
-        for contour in contours:
-            ((x, y), radius) = cv2.minEnclosingCircle(contour)
-            M = cv2.moments(contour)
-            center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
-            cv2.circle(mask, (int(x), int(y)), int(radius), 255, -1)
+            kmeans = KMeans(n_clusters=n_circles, random_state=0).fit(pixels)
+            for n in range(n_circles):
 
-        # Find contours of circles
-        circles , _ = cv2.findContours(mask, cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-        while len(circles)<n_circles: circles.append( [] )
+                mask = np.zeros_like(mask)
+                for pixel in pixels[ kmeans.labels_== n, :]: mask[ pixel[0], pixel[1] ] = 255            
+                
+                contours , _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE )
+                contour = max(contours, key=cv2.contourArea)
+                
+                ((x, y), radius) = cv2.minEnclosingCircle(contour)
+                M = cv2.moments(contour)
+                center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+
+                mask = np.zeros_like(mask)            
+                cv2.circle(mask, (int(x), int(y)), int(radius), 255, -1)
+                
+                contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE )
+                circle = max(contours, key=cv2.contourArea)
+
+                circles[n] = circle
 
         return circles
     ############################################################################################################################################
@@ -85,11 +95,11 @@ class RECORD(object):
                 camera_points = list()
                 for pixel in pixels: 
                     camera_point = self.camera_space[pixel[0], pixel[1]]
-                    if np.any(np.isinf(camera_point)): camera_point = [np.nan, np.nan, np.nan]
+                    if not np.any(camera_point) or not np.all( np.isfinite(camera_point)): camera_point = [np.nan, np.nan, np.nan]                    
                     camera_points.append( camera_point ) 
                 location = np.nanmean(camera_points, axis=0) 
             else:
-                 location = [np.nan, np.nan, np.nan]
+                location = [np.nan, np.nan, np.nan]
             locations = [*locations, *location]
         return locations     
     ############################################################################################################################################
@@ -99,21 +109,22 @@ class RECORD(object):
 ################################################################################################################################################
 if __name__ == '__main__':
 
-    dataset_name = 'dataset_01'
+    dataset_name = 'dataset_02'
     colors = ['red','blue','green'] 
 
-    for n in range(6,10):
+    for n in range(20):
         file_name = 'record_' + "{0:0=2d}".format(n)
 
         record = RECORD( dataset_name, file_name, color_setting_filename='color_setting_default')
         motions_dict = defaultdict(list)
         
+        # Loop over frames 
         while True:
             success = record.read()
             if not success: break
 
             for i, color in enumerate(colors):
-                circles = record.get_colored_circles(color, n_circles=3) 
+                circles = record.get_colored_circles(color, n_circles=3)
                 record.draw_contours(circles, color=30*i) 
                 locations = record.get_locations(circles)              
                 motions_dict[color].append(locations)
@@ -122,6 +133,9 @@ if __name__ == '__main__':
         # Save
         for color, motion in motions_dict.items():        
             markers_file_path = get_markers_file_path(dataset_name, file_name + '_' + color)
-            np.savetxt(markers_file_path, np.array(motion), delimiter="\t", fmt='%s')        
+            create_folder(markers_file_path)
+            np.savetxt(markers_file_path, np.array(motion), delimiter="\t", fmt='%s')     
+        
+        print(file_name)   
 ################################################################################################################################################    
     
