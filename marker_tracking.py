@@ -6,7 +6,7 @@ from utils import*
 class RECORD(object):
 ################################################################################################################################################    
     def __init__(self, dataset_name, file_name, color_setting_filename='color_setting_default'):
-        color_setting_file_path = get_color_setting_file_path(color_setting_filename)
+        color_setting_file_path = get_color_setting_file_path(dataset_name, color_setting_filename)
         with open(color_setting_file_path, "rb") as f: 
             self.color_setting = pickle.load(f)
 
@@ -112,7 +112,7 @@ if __name__ == '__main__':
     dataset_name = 'dataset_02'
     colors = ['red','blue','green'] 
 
-    for n in range(20):
+    for n in range(5):
         file_name = 'record_' + "{0:0=2d}".format(n)
 
         record = RECORD( dataset_name, file_name, color_setting_filename='color_setting_default')

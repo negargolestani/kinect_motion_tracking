@@ -97,7 +97,7 @@ class KINECT(object):
 ################################################################################################################################################
 if __name__ == '__main__':
     dataset_name = 'dataset_02'
-    file_name='record_19'
+    file_name='record_04'
 
     kinect = KINECT( 
         top_margin=0.15, 

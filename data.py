@@ -94,23 +94,34 @@ class NODE(object):
 ####################################################################################################################################################
 class SYSTEM(object):
     ################################################################################################################################################
-    def __init__(self, reader_markers_color='red'):
+    def __init__(self, system_info = None):
+        self.reader = None
+        self.tags = list()
+
+        if system_info is not None:
+            system_info_ = system_info.copy()
+            reader_markers_color = system_info_.pop('reader')
+            self.add_reader(reader_markers_color)
+            for IDD,markers_color in system_info_.items(): self.add_tag(markers_color, IDD)
+        return
+    ################################################################################################################################################
+    def add_reader(self, reader_markers_color):
         self.reader = NODE( reader_markers_color )
-        self.tags = list()        
+        return
     ################################################################################################################################################
     def add_tag(self, markers_color, IDD):
         self.tags.append( NODE(markers_color, IDD) )   
         return               
     ################################################################################################################################################
-    def load(self, file_name):
+    def load(self, dataset_name, file_name):
         # Loading + time shift
         
-        self.reader.load_markers(file_name) 
+        self.reader.load_markers(dataset_name, file_name) 
         start_time = self.reader.markers.time.iloc[0]
 
         for i,tag in enumerate(self.tags):            
-            self.tags[i].load_markers(file_name)
-            self.tags[i].load_rssi(file_name) 
+            self.tags[i].load_markers(dataset_name, file_name)
+            self.tags[i].load_rssi(dataset_name, file_name) 
             start_time = min( start_time, tag.rssi.time.iloc[0])
 
         self.reader.shift_time(start_time)    
@@ -166,21 +177,22 @@ class SYSTEM(object):
 ####################################################################################################################################################
 if __name__ == '__main__':
 
-    sys = SYSTEM(reader_markers_color='red')
-    sys.add_tag('blue', 'E002240002749F45')
-    sys.add_tag('green', 'E002240002819E59')
-    
-    dataset_name = 'dataset_01'
+    dataset_name = 'dataset_01'    
 
-    data = pd.DataFrame()
+    rfid_info = get_rfid_info(dataset_name)
+    sys = SYSTEM( system_info=rfid_info )
+
+    dataset = pd.DataFrame()
     for n in range(1,10):
         file_name = 'record_' + "{0:0=2d}".format(n)
-        sys.load(file_name) 
+        sys.load(dataset_name, file_name) 
+        data = sys.get_data()
+        
+        dataset = data.append( data , ignore_index = True)
 
-        data = data.append( sys.get_data() , ignore_index = True)
-
-    # print(data.head())
-    data.to_pickle( get_dataset_file_path(dataset_name) )  
+    # print(dataset)
+    dataset_file_path = get_dataset_file_path(dataset_name)
+    dataset.to_pickle( dataset_file_path )  
 ####################################################################################################################################################
 
 
@@ -188,25 +200,31 @@ if __name__ == '__main__':
 # ####################################################################################################################################################
 # if __name__ == '__main__':
 
-#     sys = SYSTEM(reader_markers_color='red')
-#     sys.add_tag('blue', 'E002240002749F45')
-#     sys.add_tag('green', 'E002240002819E59')
+    # dataset_name = 'dataset_01'    
+    # rfid_info = get_rfid_info(dataset_name)
     
-#     file_name = 'record_01'       
-#     sys.load(file_name)    
+    # sys = SYSTEM(system_info=rfid_info)
+    # sys.add_tag('blue', 'E0022400028402EB')
+    # sys.add_tag('green', 'E002240002749F45')
 
-#     rssi = sys.get_rssi_data()
-#     motion = sys.get_motion_data()
-#     motion_ = resample_df(motion, rssi.time)
+    # file_name = 'record_00'   
+
+    # # sys.tags[0].load_rssi(dataset_name, file_name)
+    # # print(sys.tags[0])
+    # sys.load(dataset_name, file_name)    
+
+    # rssi = sys.get_rssi_data()
+    # motion = sys.get_motion_data()
+    # motion_ = resample_df(motion, rssi.time)
 
    
-#     y = 'misalignment_0'
-#     ax = motion.plot(x='time', y=y)
-#     motion_.plot(x='time', y=y, ax=ax)
+    # y = 'misalignment_0'
+    # ax = motion.plot(x='time', y=y)
+    # motion_.plot(x='time', y=y, ax=ax)
 
-#     rssi.plot(x='time')   
-#     plt.show()
-# ####################################################################################################################################################
+    # rssi.plot(x='time')   
+    # plt.show()
+####################################################################################################################################################
 
    
     

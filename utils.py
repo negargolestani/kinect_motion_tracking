@@ -45,8 +45,13 @@ def get_rssi_file_path(dataset_name, file_name):
 def get_dataset_file_path(dataset_name):
     return main_directory + '/' + dataset_folder_name + '/' + dataset_name + '/' + dataset_name + '.pkl'
 ####################################################################################################################################################
-def get_color_setting_file_path(file_name):
-    return main_directory + '/' + dataset_folder_name + '/calibration_setting/' + file_name + '.pickle'
+def get_color_setting_file_path(dataset_name, file_name):
+    return main_directory + '/' + dataset_folder_name +  '/' + dataset_name  + '/calibration_setting/' + file_name + '.pickle'
+####################################################################################################################################################
+def get_rfid_info(dataset_name):
+    file_path = main_directory + '/' + dataset_folder_name +  '/' + dataset_name  + '/calibration_setting/rfid_info.txt'
+    with open(file_path , 'r') as f: rfid_info = dict(x.rstrip().split(None, 1) for x in f)
+    return rfid_info
 ####################################################################################################################################################
 
 
