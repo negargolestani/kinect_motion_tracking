@@ -4,16 +4,16 @@ from utils import*
 ################################################################################################################################################
 class RECORD(object):
 ################################################################################################################################################    
-    def __init__(self, file_name, color_setting_filename='color_setting_default'):
+    def __init__(self, dataset_name, file_name, color_setting_filename='color_setting_default'):
         color_setting_file_path = get_color_setting_file_path(color_setting_filename)
         with open(color_setting_file_path, "rb") as f: 
             self.color_setting = pickle.load(f)
 
-        camera_space_file_path = get_camera_space_file_path(file_name) 
+        camera_space_file_path = get_camera_space_file_path(dataset_name, file_name) 
         with open(camera_space_file_path, "rb") as f: 
             self.camera_spaces = pickle.load(f)
 
-        video_file_path = get_color_video_file_path(file_name)
+        video_file_path = get_color_video_file_path(dataset_name, file_name)
         self.color_vid = cv2.VideoCapture(video_file_path)
 
         self.next_idx = 0 
@@ -99,12 +99,13 @@ class RECORD(object):
 ################################################################################################################################################
 if __name__ == '__main__':
 
+    dataset_name = 'dataset_01'
     colors = ['red','blue','green'] 
 
     for n in range(6,10):
         file_name = 'record_' + "{0:0=2d}".format(n)
 
-        record = RECORD( file_name, color_setting_filename='color_setting_default')
+        record = RECORD( dataset_name, file_name, color_setting_filename='color_setting_default')
         motions_dict = defaultdict(list)
         
         while True:
@@ -120,7 +121,7 @@ if __name__ == '__main__':
 
         # Save
         for color, motion in motions_dict.items():        
-            motion_file_path = get_motion_file_path(file_name + '_' + color)
-            np.savetxt(motion_file_path, np.array(motion), delimiter="\t", fmt='%s')        
+            markers_file_path = get_markers_file_path(dataset_name, file_name + '_' + color)
+            np.savetxt(markers_file_path, np.array(motion), delimiter="\t", fmt='%s')        
 ################################################################################################################################################    
     

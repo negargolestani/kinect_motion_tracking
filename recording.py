@@ -1,9 +1,9 @@
+from utils import* 
 
 from pykinect2 import PyKinectV2
 from pykinect2.PyKinectV2 import *
 from pykinect2 import PyKinectRuntime
 
-from utils import* 
 
 ####################################################################################################################################################
 class KINECT(object):
@@ -49,12 +49,16 @@ class KINECT(object):
             if wait is not None: cv2.waitKey(wait)
         return    
     ################################################################################################################################################
-    def record(self, file_name):
+    def record(self, dataset_name, file_name):
         
         # Initialization
-        time_file_path = get_time_file_path(file_name)
-        color_video_file_path = get_color_video_file_path(file_name)
-        camera_space_file_path = get_camera_space_file_path(file_name) 
+        time_file_path = get_time_file_path(dataset_name, file_name)
+        color_video_file_path = get_color_video_file_path(dataset_name, file_name)
+        camera_space_file_path = get_camera_space_file_path(dataset_name, file_name) 
+
+        create_folder(time_file_path)
+        create_folder(color_video_file_path)
+        create_folder(camera_space_file_path)
 
         time_txt = ''
         color_vid = cv2.VideoWriter(color_video_file_path, cv2.VideoWriter_fourcc(*'DIVX'), 30.0, (self.kinect.color_frame_desc.Width,self.kinect.color_frame_desc.Height))
@@ -91,13 +95,14 @@ class KINECT(object):
 
 ################################################################################################################################################
 if __name__ == '__main__':
-    file_name='record_10'
+    dataset_name = 'dataset_02'
+    file_name='record_01'
 
     kinect = KINECT( 
         top_margin=0.15, 
         bottom_margin=0.15, 
         left_margin=0.2, 
         right_margin=0.2)            
-    kinect.record(file_name)
+    kinect.record(dataset_name, file_name)
 ################################################################################################################################################
         

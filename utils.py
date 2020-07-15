@@ -21,33 +21,35 @@ from scipy import signal, interpolate
 from collections import defaultdict
 
 
+
 main_directory = str( Path(__file__).parents[1] )
-# datime_format = '%y-%m-%d-%H-%M-%S-%f'
 datime_format = '%H:%M:%S.%f'
+dataset_folder_name = 'dataset'
 
-
 ####################################################################################################################################################
-def get_time_file_path(file_name):
-    return main_directory + '/data/kinect/time/' + file_name + '.txt'
+def get_time_file_path(dataset_name, file_name):
+    return main_directory + '/' + dataset_folder_name + '/' + dataset_name + '/kinect/time/' + file_name + '.txt'
 ####################################################################################################################################################
-def get_color_video_file_path(file_name):
-    return main_directory + '/data/kinect/color_video/' + file_name + '.avi'
+def get_color_video_file_path(dataset_name, file_name):
+    return main_directory + '/' + dataset_folder_name + '/' + dataset_name + '/kinect/color_video/' + file_name + '.avi'
 ####################################################################################################################################################
-def get_camera_space_file_path(file_name):
-    return main_directory + '/data/kinect/camera_space/' + file_name + '.pkl'
+def get_camera_space_file_path(dataset_name, file_name):
+    return main_directory + '/' + dataset_folder_name + '/' + dataset_name + '/kinect/camera_space/' + file_name + '.pkl'
 ####################################################################################################################################################
-def get_motion_file_path(file_name):
-    return main_directory + '/data/kinect/markers/' + file_name + '.txt'
+def get_markers_file_path(dataset_name, file_name):
+    return main_directory + '/' + dataset_folder_name + '/' + dataset_name + '/kinect/markers/' + file_name + '.txt'
 ####################################################################################################################################################
-def get_rssi_file_path(file_name):
-    return main_directory + '/data/rfid/rssi/' + file_name + '.csv'
+def get_rssi_file_path(dataset_name, file_name):
+    return main_directory + '/' + dataset_folder_name + '/' + dataset_name + '/rfid/' + file_name + '.csv'
+####################################################################################################################################################
+def get_dataset_file_path(dataset_name):
+    return main_directory + '/' + dataset_folder_name + '/' + dataset_name + '/' + dataset_name + '.pkl'
 ####################################################################################################################################################
 def get_color_setting_file_path(file_name):
-    return main_directory + '/data/kinect/calibration_setting/' + file_name + '.pickle'
+    return main_directory + '/' + dataset_folder_name + '/calibration_setting/' + file_name + '.pickle'
 ####################################################################################################################################################
-def get_color_image_file_path(file_name):
-    return main_directory + '/data/kinect/calibration_setting/' + file_name + '.png'
-####################################################################################################################################################
+
+
 
 
 ####################################################################################################################################################
