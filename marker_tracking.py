@@ -96,8 +96,7 @@ class RECORD(object):
             for pixel in  self.get_pixels(contour):                 
                 camera_point = self.camera_space[pixel[0], pixel[1]]
                 if np.all( np.isfinite(camera_point)): camera_points.append( camera_point ) 
-            
-            if len(camera_point): location = np.nanmean(camera_points, axis=0) 
+            if len(camera_points): location = np.nanmean(np.array(camera_points), axis=0) 
             else: location = [np.nan, np.nan, np.nan]
             locations = [*locations, *location]
 
@@ -112,7 +111,7 @@ if __name__ == '__main__':
     dataset_name = 'dataset_02'
     colors = ['red','blue','green'] 
 
-    for n in range(30):
+    for n in range(3,30):
         file_name = 'record_' + "{0:0=2d}".format(n)
 
         record = RECORD( dataset_name, file_name, color_setting_filename='color_setting_default')
@@ -125,10 +124,10 @@ if __name__ == '__main__':
 
             for i, color in enumerate(colors):
                 circles = record.get_colored_circles(color, n_circles=3)
-                record.draw_contours(circles, color=30*i) 
+                # record.draw_contours(circles, color=30*i) 
                 locations = record.get_locations(circles)              
                 motions_dict[color].append(locations)            
-            record.show(wait=1)
+            # record.show(wait=1)
 
         # Save
         for color, motion in motions_dict.items():        
