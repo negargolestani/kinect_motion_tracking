@@ -114,8 +114,10 @@ class SYSTEM(object):
         return               
     ################################################################################################################################################
     def load(self, dataset_name, file_name):
+        self.dataset_name = dataset_name
+        self.file_name = file_name
+
         # Loading + time shift
-        
         self.reader.load_markers(dataset_name, file_name) 
         start_time = self.reader.markers.time.iloc[0]
 
@@ -129,7 +131,7 @@ class SYSTEM(object):
         
         return
     ################################################################################################################################################
-    def get_rssi_data(self, smooth=True, window_length=5):
+    def get_rssi_data(self, window_length=5):
         rssi = pd.DataFrame({'time':self.tags[0].rssi.time})
         for i, tag in enumerate(self.tags):
             tag_rssi = sys.tags[i].rssi.rename({'rssi':'rssi_'+str(i)}, axis=1)
@@ -139,7 +141,7 @@ class SYSTEM(object):
 
         return rssi
     ################################################################################################################################################
-    def get_motion_data(self, smooth=True, window_length=5):   
+    def get_motion_data(self, window_length=5):   
         # Modify this function for different targeted movements
         motion = pd.DataFrame({'time':self.reader.markers.time})
         ref_center = self.reader.center()
@@ -153,7 +155,7 @@ class SYSTEM(object):
 
         return motion
     ################################################################################################################################################
-    def get_data(self):
+    def get_data(self, window_length=11, save=False):
         rssi = self.get_rssi_data()
         motion = self.get_motion_data()
 
@@ -168,63 +170,66 @@ class SYSTEM(object):
         for i in range(len(self.tags)):
             data = data.astype({ 'rssi_'+str(i) : int, 'distance_'+str(i) : float, 'misalignment_'+str(i) : float })                
 
+        data = data.rolling(11, axis=0).mean()      # Smoothing
+        data = data.ffill(axis=0).bfill(axis=0)     # Gap Filling
+
+        if save:
+            dataset_file_path = get_dataset_file_path(self.dataset_name, self.file_name)
+            create_folder(dataset_file_path)
+            data.to_pickle( dataset_file_path )  
+            
         return data
 ####################################################################################################################################################
-
-
-      
-
-####################################################################################################################################################
-if __name__ == '__main__':
-
-    dataset_name = 'dataset_01'    
-
-    rfid_info = get_rfid_info(dataset_name)
-    sys = SYSTEM( system_info=rfid_info )
-
-    dataset = pd.DataFrame()
-    for n in range(1,10):
-        file_name = 'record_' + "{0:0=2d}".format(n)
-        sys.load(dataset_name, file_name) 
-        data = sys.get_data()
-        
-        dataset = data.append( data , ignore_index = True)
-
-    # print(dataset)
-    dataset_file_path = get_dataset_file_path(dataset_name)
-    dataset.to_pickle( dataset_file_path )  
-####################################################################################################################################################
-
 
 
 # ####################################################################################################################################################
 # if __name__ == '__main__':
 
-    # dataset_name = 'dataset_01'    
-    # rfid_info = get_rfid_info(dataset_name)
-    
-    # sys = SYSTEM(system_info=rfid_info)
-    # sys.add_tag('blue', 'E0022400028402EB')
-    # sys.add_tag('green', 'E002240002749F45')
+#     dataset_name = 'dataset_01'    
 
-    # file_name = 'record_00'   
+#     rfid_info = get_rfid_info(dataset_name)
+#     sys = SYSTEM( system_info=rfid_info )
 
-    # # sys.tags[0].load_rssi(dataset_name, file_name)
-    # # print(sys.tags[0])
-    # sys.load(dataset_name, file_name)    
+#     for n in range(25):
+#         file_name = 'record_' + "{0:0=2d}".format(n)
+#         sys.load(dataset_name, file_name) 
+#         data = sys.get_data(save=True)        
+#         # print(dataset)
 
-    # rssi = sys.get_rssi_data()
-    # motion = sys.get_motion_data()
-    # motion_ = resample_df(motion, rssi.time)
+# ####################################################################################################################################################
+
 
    
-    # y = 'misalignment_0'
-    # ax = motion.plot(x='time', y=y)
-    # motion_.plot(x='time', y=y, ax=ax)
-
-    # rssi.plot(x='time')   
-    # plt.show()
 ####################################################################################################################################################
+if __name__ == '__main__':
+
+    dataset_name = 'dataset_01'    
+
+    rfid_info = get_rfid_info(dataset_name)    
+    sys = SYSTEM(system_info=rfid_info)
+    
+    for n in range(25):
+        file_name = 'record_' + "{0:0=2d}".format(n)
+        sys.load(dataset_name, file_name) 
+        # data = sys.get_data(save=True)        
+        
+        rssi = sys.get_rssi_data()
+        motion = sys.get_motion_data()
+
+
+        fig, axs = plt.subplots(3,1)
+
+        motion.plot(y='distance_0', ax=axs[0])
+        motion.plot(y='distance_1', ax=axs[0])
+
+        motion.plot(y='misalignment_0', ax=axs[1])
+        motion.plot(y='misalignment_1', ax=axs[1])
+
+        rssi.plot(y='rssi_0', ax=axs[2])
+        rssi.plot(y='rssi_1', ax=axs[2])
+
+        plt.show()
+###################################################################################################################################################
 
    
     
