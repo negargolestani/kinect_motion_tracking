@@ -1,5 +1,7 @@
 __pycache__/
-
+catboost_info/
+.ipynb_checkpoints/
+__pycache__/
 *.jpg
 *.jpeg
 *.png
