@@ -82,25 +82,25 @@ class RECORD(object):
         return circles
     ############################################################################################################################################
     def get_pixels(self, contour):
-        mask = np.zeros((self.frame.shape[0], self.frame.shape[1],3))
-        mask = cv2.drawContours(mask, [contour], 0, (1,0,0), thickness=cv2.FILLED)
-        x,y = np.where(mask[:,:,0]==1)
-        return np.stack((x,y),axis=-1)
+        if len(contour):
+            mask = np.zeros((self.frame.shape[0], self.frame.shape[1],3))
+            mask = cv2.drawContours(mask, [contour], 0, (1,0,0), thickness=cv2.FILLED)
+            x,y = np.where(mask[:,:,0]==1)
+            return np.stack((x,y),axis=-1)
+        return list()
     ############################################################################################################################################
-    def get_locations(self, contours):
-        locations = list()
+    def get_locations(self, contours):        
+        locations = list()        
         for contour in contours:
-            if len(contour):               
-                pixels = self.get_pixels(contour) 
-                camera_points = list()
-                for pixel in pixels: 
-                    camera_point = self.camera_space[pixel[0], pixel[1]]
-                    if not np.any(camera_point) or not np.all( np.isfinite(camera_point)): camera_point = [np.nan, np.nan, np.nan]                    
-                    camera_points.append( camera_point ) 
-                location = np.nanmean(camera_points, axis=0) 
-            else:
-                location = [np.nan, np.nan, np.nan]
+            camera_points = list()            
+            for pixel in  self.get_pixels(contour):                 
+                camera_point = self.camera_space[pixel[0], pixel[1]]
+                if np.all( np.isfinite(camera_point)): camera_points.append( camera_point ) 
+            
+            if len(camera_point): location = np.nanmean(camera_points, axis=0) 
+            else: location = [np.nan, np.nan, np.nan]
             locations = [*locations, *location]
+
         return locations     
     ############################################################################################################################################
 
@@ -112,7 +112,7 @@ if __name__ == '__main__':
     dataset_name = 'dataset_02'
     colors = ['red','blue','green'] 
 
-    for n in range(5):
+    for n in range(30):
         file_name = 'record_' + "{0:0=2d}".format(n)
 
         record = RECORD( dataset_name, file_name, color_setting_filename='color_setting_default')
@@ -127,7 +127,7 @@ if __name__ == '__main__':
                 circles = record.get_colored_circles(color, n_circles=3)
                 record.draw_contours(circles, color=30*i) 
                 locations = record.get_locations(circles)              
-                motions_dict[color].append(locations)
+                motions_dict[color].append(locations)            
             record.show(wait=1)
 
         # Save

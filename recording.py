@@ -49,7 +49,7 @@ class KINECT(object):
             if wait is not None: cv2.waitKey(wait)
         return    
     ################################################################################################################################################
-    def record(self, dataset_name, file_name):
+    def record(self, dataset_name, file_name, record_time=40):
         
         # Initialization
         time_file_path = get_time_file_path(dataset_name, file_name)
@@ -76,7 +76,7 @@ class KINECT(object):
         while cv2.waitKey(1)!=27:                        
             self.read(full=True)
             if start_time is None: start_time = datetime.combine(date.min, self.time)
-            elif  (datetime.combine(date.min, self.time) -start_time).total_seconds() > 40: break
+            elif  (datetime.combine(date.min, self.time) -start_time).total_seconds() > record_time: break
             self.show()
             time_txt += self.time.strftime( datime_format )  + '\n'  
             color_vid.write( cv2.cvtColor(self.color_image, cv2.COLOR_RGBA2RGB) )            
@@ -97,13 +97,13 @@ class KINECT(object):
 ################################################################################################################################################
 if __name__ == '__main__':
     dataset_name = 'dataset_02'
-    file_name='record_04'
+    file_name='record_29'
 
     kinect = KINECT( 
         top_margin=0.15, 
         bottom_margin=0.15, 
         left_margin=0.2, 
         right_margin=0.2)            
-    kinect.record(dataset_name, file_name)
+    kinect.record(dataset_name, file_name, record_time=60)
 ################################################################################################################################################
         
