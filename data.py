@@ -183,60 +183,62 @@ class SYSTEM(object):
 ####################################################################################################################################################
 
 
-# ####################################################################################################################################################
-# if __name__ == '__main__':
-
-#     dataset_name = 'dataset_01'    
-
-#     rfid_info = get_rfid_info(dataset_name)
-#     sys = SYSTEM( system_info=rfid_info )
-
-#     for n in range(25):
-#         file_name = 'record_' + "{0:0=2d}".format(n)
-#         sys.load(dataset_name, file_name) 
-#         data = sys.get_data(save=True)        
-#         # print(dataset)
-
-# ####################################################################################################################################################
-
-
-   
 ####################################################################################################################################################
 if __name__ == '__main__':
 
     dataset_name = 'dataset_02'    
 
-    rfid_info = get_rfid_info(dataset_name)    
-    sys = SYSTEM(system_info=rfid_info)
-    
-    for n in range(1):
+    rfid_info = get_rfid_info(dataset_name)
+    sys = SYSTEM( system_info=rfid_info )
+
+    for n in range(30):
         file_name = 'record_' + "{0:0=2d}".format(n)
+        sys.load(dataset_name, file_name) 
+        data = sys.get_data(save=True)        
+        print(file_name)
 
-        sys.load(dataset_name, file_name)     
+####################################################################################################################################################
+
+
+   
+# ####################################################################################################################################################
+# if __name__ == '__main__':
+
+#     dataset_name = 'dataset_02'    
+
+#     rfid_info = get_rfid_info(dataset_name)    
+#     sys = SYSTEM(system_info=rfid_info)
+    
+#     for n in range(30):
+#         file_name = 'record_' + "{0:0=2d}".format(n)
+
+#         sys.load(dataset_name, file_name)     
         
-        rssi = sys.get_rssi_data()
-        motion = sys.get_motion_data()
-        data = sys.get_data()
+#         rssi = sys.get_rssi_data()
+#         motion = sys.get_motion_data()
+#         data = sys.get_data()
 
-        fig, axs = plt.subplots(3,1)
+#         fig, axs = plt.subplots(3,1)
+            
+#         motion.plot(x='time', y='distance_0', ax=axs[0])
+#         motion.plot(x='time', y='distance_1', ax=axs[0])
+#         data.plot(x='time', y='distance_0', ax=axs[0])
+#         data.plot(x='time', y='distance_1', ax=axs[0])
 
-        motion.plot(x='time', y='distance_0', ax=axs[0])
-        motion.plot(x='time', y='distance_1', ax=axs[0])
-        data.plot(x='time', y='distance_0', ax=axs[0])
-        data.plot(x='time', y='distance_1', ax=axs[0])
+#         motion.plot(x='time', y='misalignment_0', ax=axs[1])
+#         motion.plot(x='time', y='misalignment_1', ax=axs[1])
+#         data.plot(x='time', y='misalignment_0', ax=axs[1])
+#         data.plot(x='time', y='misalignment_1', ax=axs[1])
 
-        motion.plot(x='time', y='misalignment_0', ax=axs[1])
-        motion.plot(x='time', y='misalignment_1', ax=axs[1])
-        data.plot(x='time', y='misalignment_0', ax=axs[1])
-        data.plot(x='time', y='misalignment_1', ax=axs[1])
+#         sys.tags[0].rssi.plot(x='time', y='rssi', ax=axs[2])
+#         sys.tags[1].rssi.plot(x='time', y='rssi', ax=axs[2])
+#         rssi.plot(x='time', y='rssi_0', ax=axs[2])
+#         rssi.plot(x='time', y='rssi_1', ax=axs[2])
+#         data.plot(x='time', y='rssi_0', ax=axs[2])
+#         data.plot (x='time', y='rssi_1', ax=axs[2])
 
-        rssi.plot(x='time', y='rssi_0', ax=axs[2])
-        rssi.plot(x='time', y='rssi_1', ax=axs[2])
-        data.plot(x='time', y='rssi_0', ax=axs[2])
-        data.plot (x='time', y='rssi_1', ax=axs[2])
-
-        plt.show()
-###################################################################################################################################################
+#         plt.show()
+# ###################################################################################################################################################
 
    
     
