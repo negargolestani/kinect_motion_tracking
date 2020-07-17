@@ -135,6 +135,6 @@ if __name__ == '__main__':
             create_folder(markers_file_path)
             np.savetxt(markers_file_path, np.array(motion), delimiter="\t", fmt='%s')     
         
-        print(file_name)   
+        print(file_name, 'is saved.')   
 ################################################################################################################################################    
     
