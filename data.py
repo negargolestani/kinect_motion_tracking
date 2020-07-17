@@ -145,7 +145,7 @@ class SYSTEM(object):
         # Modify this function for different targeted movements
         motion = pd.DataFrame({'time':self.reader.markers.time})
 
-        N = 100
+        N = 10
         ref_center = self.reader.center()
         ref_norm = self.reader.norm()            
         ref_center = np.ones(np.shape(ref_center)) * np.mean(ref_center[:N], axis=0)
@@ -170,9 +170,6 @@ class SYSTEM(object):
         new_time = new_time[ motion.time.iloc[0] < new_time]
         new_time = new_time[ new_time < motion.time.iloc[-1] ]
         data = data.merge( new_time, on='time', how='inner', suffixes=('', ''), sort=True )
-
-        for i in range(len(self.tags)):
-            data = data.astype({ 'rssi_'+str(i) : int, 'distance_'+str(i) : float, 'misalignment_'+str(i) : float })                
 
         data = data.rolling(11, axis=0).mean()      # Smoothing
         data = data.ffill(axis=0).bfill(axis=0)     # Gap Filling
@@ -236,7 +233,7 @@ if __name__ == '__main__':
         rssi.plot(x='time', y='rssi_0', ax=axs[2])
         rssi.plot(x='time', y='rssi_1', ax=axs[2])
         data.plot(x='time', y='rssi_0', ax=axs[2])
-        data.plot(x='time', y='rssi_1', ax=axs[2])
+        data.plot (x='time', y='rssi_1', ax=axs[2])
 
         plt.show()
 ###################################################################################################################################################
