@@ -88,16 +88,17 @@ class KINECT(object):
 
         with open(time_file_path, 'w') as f: f.write( time_txt)   
         with open(camera_space_file_path,"wb") as f: pickle.dump(camera_space, f)            
-        
+
         print('Done!')
         return        
 ####################################################################################################################################################
 
 
+
 ################################################################################################################################################
 if __name__ == '__main__':
-    dataset_name = 'dataset_02'
-    file_name='record_29'
+    dataset_name = 'dataset_03'
+    file_name='record_18'
 
     kinect = KINECT( 
         top_margin=0.15, 

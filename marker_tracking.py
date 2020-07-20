@@ -108,10 +108,10 @@ class RECORD(object):
 ################################################################################################################################################
 if __name__ == '__main__':
 
-    dataset_name = 'dataset_02'
+    dataset_name = 'dataset_03'
     colors = ['red','blue','green'] 
 
-    for n in range(3,30):
+    for n in range(18):
         file_name = 'record_' + "{0:0=2d}".format(n)
 
         record = RECORD( dataset_name, file_name, color_setting_filename='color_setting_default')
@@ -124,10 +124,10 @@ if __name__ == '__main__':
 
             for i, color in enumerate(colors):
                 circles = record.get_colored_circles(color, n_circles=3)
-                # record.draw_contours(circles, color=30*i) 
+                record.draw_contours(circles, color=30*i) 
                 locations = record.get_locations(circles)              
                 motions_dict[color].append(locations)            
-            # record.show(wait=1)
+            record.show(wait=1)
 
         # Save
         for color, motion in motions_dict.items():        

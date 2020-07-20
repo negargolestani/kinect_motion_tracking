@@ -13,7 +13,6 @@ def resample_df(df, new_time):
 ####################################################################################################################################################
 
 
-
 ####################################################################################################################################################
 class NODE(object):
     n_marker = 3
@@ -183,58 +182,33 @@ class SYSTEM(object):
 ####################################################################################################################################################
 
 
+
 ####################################################################################################################################################
 if __name__ == '__main__':
 
-    dataset_name = 'dataset_02'    
+    dataset_name = 'dataset_03'    
 
-    rfid_info = get_rfid_info(dataset_name)    
-    sys = SYSTEM(system_info=rfid_info)
-    
-    for n in range(1):
+    rfid_info = get_rfid_info(dataset_name)
+    sys = SYSTEM( system_info=rfid_info )
+
+    for n in range(18):
         file_name = 'record_' + "{0:0=2d}".format(n)
-
-        sys.load(dataset_name, file_name)     
-        
-        d = sys.tags[0].center() - sys.tags[1].center()
-        d = (np.sum(d**2, axis=1))**0.5
-
-          
-        plt.plot(d)
-        plt.show()
-            
-
-###################################################################################################################################################
-
-
-
-# ####################################################################################################################################################
-# if __name__ == '__main__':
-
-#     dataset_name = 'dataset_02'    
-
-#     rfid_info = get_rfid_info(dataset_name)
-#     sys = SYSTEM( system_info=rfid_info )
-
-#     for n in range(30):
-#         file_name = 'record_' + "{0:0=2d}".format(n)
-#         sys.load(dataset_name, file_name) 
-#         data = sys.get_data(save=True)        
-#         print(file_name)
-
-# ####################################################################################################################################################
+        sys.load(dataset_name, file_name) 
+        data = sys.get_data(save=True)        
+        print(file_name)
+####################################################################################################################################################
 
 
    
 # ####################################################################################################################################################
 # if __name__ == '__main__':
 
-#     dataset_name = 'dataset_02'    
+#     dataset_name = 'dataset_03'    
 
 #     rfid_info = get_rfid_info(dataset_name)    
 #     sys = SYSTEM(system_info=rfid_info)
     
-#     for n in range(2):
+#     for n in [12]:
 #         file_name = 'record_' + "{0:0=2d}".format(n)
 
 #         sys.load(dataset_name, file_name)     
@@ -245,20 +219,20 @@ if __name__ == '__main__':
 
 #         fig, axs = plt.subplots(3,1)
             
-#         # motion.plot(x='time', y='distance_0', ax=axs[0])
-#         # motion.plot(x='time', y='distance_1', ax=axs[0])
+#         motion.plot(x='time', y='distance_0', ax=axs[0])
+#         motion.plot(x='time', y='distance_1', ax=axs[0])
 #         data.plot(x='time', y='distance_0', ax=axs[0])
 #         data.plot(x='time', y='distance_1', ax=axs[0])
 
-#         # motion.plot(x='time', y='misalignment_0', ax=axs[1])
-#         # motion.plot(x='time', y='misalignment_1', ax=axs[1])
+#         motion.plot(x='time', y='misalignment_0', ax=axs[1])
+#         motion.plot(x='time', y='misalignment_1', ax=axs[1])
 #         data.plot(x='time', y='misalignment_0', ax=axs[1])
 #         data.plot(x='time', y='misalignment_1', ax=axs[1])
 
-#         # sys.tags[0].rssi.plot(x='time', y='rssi', ax=axs[2])
-#         # sys.tags[1].rssi.plot(x='time', y='rssi', ax=axs[2])
-#         # rssi.plot(x='time', y='rssi_0', ax=axs[2])
-#         # rssi.plot(x='time', y='rssi_1', ax=axs[2])
+#         sys.tags[0].rssi.plot(x='time', y='rssi', ax=axs[2])
+#         sys.tags[1].rssi.plot(x='time', y='rssi', ax=axs[2])
+#         rssi.plot(x='time', y='rssi_0', ax=axs[2])
+#         rssi.plot(x='time', y='rssi_1', ax=axs[2])
 #         data.plot(x='time', y='rssi_0', ax=axs[2])
 #         data.plot (x='time', y='rssi_1', ax=axs[2])
 
