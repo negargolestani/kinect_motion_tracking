@@ -86,7 +86,7 @@ class NODE(object):
         v1 = markers_npy[:,1,:] - markers_npy[:,0,:]
         v2 = markers_npy[:,2,:] - markers_npy[:,0,:] 
         norm = np.cross( v1, v2)
-        norm[ norm[:,2]<0, :] *= -1 
+        # norm[ norm[:,2]<0, :] *= -1 
         norm = signal.savgol_filter( norm, window_length=window_length, polyorder=polyorder, axis=0)  
         norm = norm / ( np.reshape(np.linalg.norm(norm, axis=1), (-1,1)) * np.ones((1,3))) 
         return norm
@@ -130,17 +130,15 @@ class SYSTEM(object):
         
         return
     ################################################################################################################################################
-    def get_rssi_data(self, window_length=5):
+    def get_rssi_data(self, window_length=11):
         rssi = pd.DataFrame({'time':self.tags[0].rssi.time})
         for i, tag in enumerate(self.tags):
             tag_rssi = sys.tags[i].rssi.rename({'rssi':'rssi_'+str(i)}, axis=1)
             rssi = rssi.merge( tag_rssi, on='time', how='outer', suffixes=('', ''), sort=True )
 
-        rssi.fillna(method='ffill', axis=0, inplace=True)             
-
         return rssi
     ################################################################################################################################################
-    def get_motion_data(self, window_length=5):   
+    def get_motion_data(self, window_length=11):   
         # Modify this function for different targeted movements
         motion = pd.DataFrame({'time':self.reader.markers.time})
 
@@ -152,15 +150,22 @@ class SYSTEM(object):
 
         for i, tag in enumerate(self.tags):
             motion['distance_'+str(i)] = np.linalg.norm( ref_center - tag.center(), axis=1)
-            motion['misalignment_'+str(i)] = ( np.arccos(np.abs(np.sum(np.multiply( ref_norm, tag.norm()), axis=1)) ) * 180/np.pi )
 
-        motion.fillna(method='ffill', axis=0, inplace=True)  
+            # misalignment = np.arccos(np.abs(np.sum(np.multiply( ref_norm, tag.norm()), axis=1))) * 180/np.pi 
+            misalignment = np.arcsin(np.linalg.norm(np.cross(ref_norm, tag.norm()), axis=1)) *180/np.pi
+
+            misalignment = signal.savgol_filter( misalignment, window_length=window_length, polyorder=1, axis=0)    
+            motion['misalignment_'+str(i)] = misalignment          
 
         return motion
     ################################################################################################################################################
     def get_data(self, window_length=11, save=False):
         rssi = self.get_rssi_data()
+        rssi.fillna(method='ffill', axis=0, inplace=True)             
+
         motion = self.get_motion_data()
+        motion.fillna(method='ffill', axis=0, inplace=True)  
+
 
         data = rssi.merge( motion, on='time', how='outer', suffixes=('', ''), sort=True )
         data = data.interpolate(method='nearest')
@@ -179,65 +184,117 @@ class SYSTEM(object):
             data.to_pickle( dataset_file_path )  
             
         return data
+    ################################################################################################################################################
+    def get_data_(self, window_length=11, save=False):
+        rssi = pd.DataFrame({'time':self.tags[0].rssi.time})
+        for i, tag in enumerate(self.tags):
+            tag_rssi = sys.tags[i].rssi.rename({'rssi':'rssi_'+str(i)}, axis=1)
+            rssi = rssi.merge( tag_rssi, on='time', how='outer', suffixes=('', ''), sort=True )
+
 ####################################################################################################################################################
-
-
 
 ####################################################################################################################################################
 if __name__ == '__main__':
 
-    dataset_name = 'dataset_03'    
+    dataset_name = 'dataset_02'    
 
-    rfid_info = get_rfid_info(dataset_name)
-    sys = SYSTEM( system_info=rfid_info )
-
-    for n in range(18):
+    rfid_info = get_rfid_info(dataset_name)    
+    sys = SYSTEM(system_info=rfid_info)
+    
+    for n in range(1):
         file_name = 'record_' + "{0:0=2d}".format(n)
-        sys.load(dataset_name, file_name) 
-        data = sys.get_data(save=True)        
-        print(file_name)
-####################################################################################################################################################
+        sys.load(dataset_name, file_name)
+                        
+        rssi = sys.get_rssi_data()
+        motion = sys.get_motion_data()
+        data = sys.get_data(save=False)
+        # fig, axs = plt.subplots(4,1)     
+
+        # motion.plot(x='time', y='distance_0', ax=axs[0])
+        # motion.plot(x='time', y='distance_1', ax=axs[0])
+
+        # motion.plot(x='time', y='misalignment_0', ax=axs[1])
+        # motion.plot(x='time', y='misalignment_1', ax=axs[1])
+
+        # sys.tags[0].rssi.plot(x='time', y='rssi', ax=axs[2])
+        # sys.tags[1].rssi.plot(x='time', y='rssi', ax=axs[2])
+
+        # for i in range(2):
+        #     t = sys.tags[i].rssi.time 
+        # #     # axs[3].plot(t)
+
+        #     dt = np.diff(t)
+        # #     # axs[3].scatter(t, np.ones(np.shape(t)) )
+        #     plt.plot(dt)
+            # plt.scatter(rssi.time, rssi.rssi_0)
+            # plt.scatter(rssi.time, rssi.rssi_1)
+        # plt.show()
+
+
+
+# ####################################################################################################################################################
+# if __name__ == '__main__':
+
+#     dataset_name = 'dataset_03'    
+
+#     rfid_info = get_rfid_info(dataset_name)
+#     sys = SYSTEM( system_info=rfid_info )
+
+#     for n in range(18):
+#         file_name = 'record_' + "{0:0=2d}".format(n)
+#         sys.load(dataset_name, file_name) 
+#         data = sys.get_data(save=True)        
+#         print(file_name)
+# ####################################################################################################################################################
 
 
    
 # ####################################################################################################################################################
 # if __name__ == '__main__':
 
-#     dataset_name = 'dataset_03'    
+#     dataset_name = 'dataset_04'    
 
 #     rfid_info = get_rfid_info(dataset_name)    
 #     sys = SYSTEM(system_info=rfid_info)
     
-#     for n in [12]:
+#     for n in range(1):
 #         file_name = 'record_' + "{0:0=2d}".format(n)
-
-#         sys.load(dataset_name, file_name)     
+#         print(sys.tags[0].markers_color)
+#         sys.reader.load_markers(dataset_name, file_name)
+#         sys.tags[0].load_markers(dataset_name, file_name)
+#         sys.tags[1].load_markers(dataset_name, file_name)
+#         sys.tags[1].markers.plot(x='time')
+        # sys.load(dataset_name, file_name)     
         
-#         rssi = sys.get_rssi_data()
-#         motion = sys.get_motion_data()
-#         data = sys.get_data()
+        # rssi = sys.get_rssi_data()
+        # motion = sys.get_motion_data()
+        # data = sys.get_data()
 
-#         fig, axs = plt.subplots(3,1)
+        # fig, axs = plt.subplots(3,1)
             
-#         motion.plot(x='time', y='distance_0', ax=axs[0])
-#         motion.plot(x='time', y='distance_1', ax=axs[0])
-#         data.plot(x='time', y='distance_0', ax=axs[0])
-#         data.plot(x='time', y='distance_1', ax=axs[0])
+        # motion.plot(x='time', y='distance_0', ax=axs[0])
+        # motion.plot(x='time', y='distance_1', ax=axs[0])
+        # data.plot(x='time', y='distance_0', ax=axs[0])
+        # data.plot(x='time', y='distance_1', ax=axs[0])
 
-#         motion.plot(x='time', y='misalignment_0', ax=axs[1])
-#         motion.plot(x='time', y='misalignment_1', ax=axs[1])
-#         data.plot(x='time', y='misalignment_0', ax=axs[1])
-#         data.plot(x='time', y='misalignment_1', ax=axs[1])
+        # motion.plot(x='time', y='misalignment_0', ax=axs[1])
+        # motion.plot(x='time', y='misalignment_1', ax=axs[1])
+        # data.plot(x='time', y='misalignment_0', ax=axs[1])
+        # data.plot(x='time', y='misalignment_1', ax=axs[1])
 
-#         sys.tags[0].rssi.plot(x='time', y='rssi', ax=axs[2])
-#         sys.tags[1].rssi.plot(x='time', y='rssi', ax=axs[2])
-#         rssi.plot(x='time', y='rssi_0', ax=axs[2])
-#         rssi.plot(x='time', y='rssi_1', ax=axs[2])
-#         data.plot(x='time', y='rssi_0', ax=axs[2])
-#         data.plot (x='time', y='rssi_1', ax=axs[2])
+        # sys.tags[0].rssi.plot(x='time', y='rssi', ax=axs[2])
+        # sys.tags[1].rssi.plot(x='time', y='rssi', ax=axs[2])
+        # rssi.plot(x='time', y='rssi_0', ax=axs[2])
+        # rssi.plot(x='time', y='rssi_1', ax=axs[2])
+        # data.plot(x='time', y='rssi_0', ax=axs[2])
+        # data.plot (x='time', y='rssi_1', ax=axs[2])
+        # plt.show()
 
-#         plt.show()
-# ###################################################################################################################################################
+        # dt0 = np.diff (sys.tags[0].rssi.time.to_numpy()) 
+        # plt.scatter( np.arange(len(dt0)), dt0)
+        # plt.scatter(np.arange(len(dt1)), dt1)
+        # plt.show()
+###################################################################################################################################################
 
    
     

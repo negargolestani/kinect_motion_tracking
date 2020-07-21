@@ -108,10 +108,10 @@ class RECORD(object):
 ################################################################################################################################################
 if __name__ == '__main__':
 
-    dataset_name = 'dataset_03'
+    dataset_name = 'dataset_04'
     colors = ['red','blue','green'] 
 
-    for n in range(18):
+    for n in range(1,2):
         file_name = 'record_' + "{0:0=2d}".format(n)
 
         record = RECORD( dataset_name, file_name, color_setting_filename='color_setting_default')
