@@ -37,7 +37,7 @@ class NODE(object):
         raw_df = raw_df.loc[ raw_df['IDD'] == self.IDD, :]
         self.rssi = pd.DataFrame({ 'rssi': raw_df['Ant/RSSI'].str.replace('Ant.No 1 - RSSI: ', '').astype(int) })
 
-        # Processing
+        # # Processing
         self.rssi = self.rssi.rolling(window_length, axis=0).median()   # Smoothing
         self.rssi = self.rssi.ffill(axis=0).bfill(axis=0)               # Gap Filling
          
@@ -134,9 +134,9 @@ class SYSTEM(object):
         rssi = pd.DataFrame({'time':self.tags[0].rssi.time})
         for i, tag in enumerate(self.tags):
             tag_rssi = sys.tags[i].rssi.rename({'rssi':'rssi_'+str(i)}, axis=1)
-            rssi = rssi.merge( tag_rssi, on='time', how='outer', suffixes=('', ''), sort=True )
+            rssi = rssi.merge( tag_rssi, on='time', how='outer', suffixes=('', ''), sort=True )               
 
-        return rssi
+        return rssi        
     ################################################################################################################################################
     def get_motion_data(self, window_length=11):   
         # Modify this function for different targeted movements
@@ -150,87 +150,74 @@ class SYSTEM(object):
 
         for i, tag in enumerate(self.tags):
             motion['distance_'+str(i)] = np.linalg.norm( ref_center - tag.center(), axis=1)
-
-            # misalignment = np.arccos(np.abs(np.sum(np.multiply( ref_norm, tag.norm()), axis=1))) * 180/np.pi 
-            misalignment = np.arcsin(np.linalg.norm(np.cross(ref_norm, tag.norm()), axis=1)) *180/np.pi
-
-            misalignment = signal.savgol_filter( misalignment, window_length=window_length, polyorder=1, axis=0)    
-            motion['misalignment_'+str(i)] = misalignment          
+            motion['misalignment_'+str(i)] = np.arcsin(np.linalg.norm(np.cross(ref_norm, tag.norm()), axis=1)) *180/np.pi
+            # motion['misalignment_'+str(i)] = np.arccos(np.abs(np.sum(np.multiply( ref_norm, tag.norm()), axis=1))) * 180/np.pi 
 
         return motion
     ################################################################################################################################################
-    def get_data(self, window_length=11, save=False):
+    def get_data(self, window_length=11, save=False,  data_status=False):
         rssi = self.get_rssi_data()
-        rssi.fillna(method='ffill', axis=0, inplace=True)             
-
         motion = self.get_motion_data()
-        motion.fillna(method='ffill', axis=0, inplace=True)  
+        
+        # RSSI data status
+        status = pd.DataFrame({'time':rssi.time})
+        for column in rssi.columns:
+            if column != 'time': status[column.replace('rssi','status')] = np.isnan(rssi[column].values)
 
+        time = rssi.time
+        time = time[ motion.time.iloc[0] < time]
+        time = time[ time < motion.time.iloc[-1] ]
 
         data = rssi.merge( motion, on='time', how='outer', suffixes=('', ''), sort=True )
-        data = data.interpolate(method='nearest')
-        
-        new_time = rssi.time
-        new_time = new_time[ motion.time.iloc[0] < new_time]
-        new_time = new_time[ new_time < motion.time.iloc[-1] ]
-        data = data.merge( new_time, on='time', how='inner', suffixes=('', ''), sort=True )
+        data = data.interpolate(method='nearest')        
+        data = data.merge( time, on='time', how='inner', suffixes=('', ''), sort=True )
 
-        data = data.rolling(11, axis=0).mean()      # Smoothing
-        data = data.ffill(axis=0).bfill(axis=0)     # Gap Filling
+        data = data.rolling(window_length, axis=0).mean().fillna(method='ffill', axis=0).bfill(axis=0)      
+        data['time'] = time.values
+        
+        
+        data = data.merge(status, on='time', how='inner', suffixes=('', ''), sort=True)
 
         if save:
             dataset_file_path = get_dataset_file_path(self.dataset_name, self.file_name)
             create_folder(dataset_file_path)
             data.to_pickle( dataset_file_path )  
-            
+            print(self.file_name, 'is saved.')
         return data
-    ################################################################################################################################################
-    def get_data_(self, window_length=11, save=False):
-        rssi = pd.DataFrame({'time':self.tags[0].rssi.time})
-        for i, tag in enumerate(self.tags):
-            tag_rssi = sys.tags[i].rssi.rename({'rssi':'rssi_'+str(i)}, axis=1)
-            rssi = rssi.merge( tag_rssi, on='time', how='outer', suffixes=('', ''), sort=True )
-
 ####################################################################################################################################################
+
+
 
 ####################################################################################################################################################
 if __name__ == '__main__':
 
-    dataset_name = 'dataset_02'    
+    dataset_name = 'dataset_03'    
 
     rfid_info = get_rfid_info(dataset_name)    
     sys = SYSTEM(system_info=rfid_info)
     
-    for n in range(1):
+    for n in range(18):
         file_name = 'record_' + "{0:0=2d}".format(n)
         sys.load(dataset_name, file_name)
-                        
-        rssi = sys.get_rssi_data()
-        motion = sys.get_motion_data()
-        data = sys.get_data(save=False)
+
+        data = sys.get_data(save=True)
+
         # fig, axs = plt.subplots(4,1)     
+        # data.plot(x='time', y='distance_0', ax=axs[0])
+        # data.plot(x='time', y='distance_1', ax=axs[0])
+        # data.plot(x='time', y='misalignment_0', ax=axs[1])
+        # data.plot(x='time', y='misalignment_1', ax=axs[1])
+        # data.plot(x='time', y='rssi_0', ax=axs[2])
+        # data.plot(x='time', y='rssi_1', ax=axs[2])
+        # axs[3].plot(data.status_0)
+        # axs[3].plot(data.status_1)
 
-        # motion.plot(x='time', y='distance_0', ax=axs[0])
-        # motion.plot(x='time', y='distance_1', ax=axs[0])
-
-        # motion.plot(x='time', y='misalignment_0', ax=axs[1])
-        # motion.plot(x='time', y='misalignment_1', ax=axs[1])
-
-        # sys.tags[0].rssi.plot(x='time', y='rssi', ax=axs[2])
-        # sys.tags[1].rssi.plot(x='time', y='rssi', ax=axs[2])
-
-        # for i in range(2):
-        #     t = sys.tags[i].rssi.time 
-        # #     # axs[3].plot(t)
-
-        #     dt = np.diff(t)
-        # #     # axs[3].scatter(t, np.ones(np.shape(t)) )
-        #     plt.plot(dt)
-            # plt.scatter(rssi.time, rssi.rssi_0)
-            # plt.scatter(rssi.time, rssi.rssi_1)
+        # axs[0].title.set_text(file_name)
         # plt.show()
 
+####################################################################################################################################################
 
+   
 
 # ####################################################################################################################################################
 # if __name__ == '__main__':
@@ -243,12 +230,11 @@ if __name__ == '__main__':
 #     for n in range(18):
 #         file_name = 'record_' + "{0:0=2d}".format(n)
 #         sys.load(dataset_name, file_name) 
-#         data = sys.get_data(save=True)        
+#         data = sys.get_data(save=True)   
 #         print(file_name)
-# ####################################################################################################################################################
+# # ###################################################################################################################################################
 
 
-   
 # ####################################################################################################################################################
 # if __name__ == '__main__':
 
