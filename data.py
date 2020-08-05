@@ -1,34 +1,46 @@
 from utils import*
 
 
+def load_rssi(file_path):
 
-####################################################################################################################################################
-def resample_df(df, new_time):
-    new_time_df = pd.DataFrame({'time':new_time})
-    new_df = df.merge( new_time_df, on='time', how='outer', suffixes=('', ''), sort=True )
-    new_df = new_df.interpolate(method='nearest')
-    
-    new_df = new_df.merge( new_time_df, on='time', how='inner', suffixes=('', ''), sort=True )
-    return new_df
-####################################################################################################################################################
 
 
 ####################################################################################################################################################
 class NODE(object):
-    n_marker = 3
     ################################################################################################################################################
-    def __init__(self, markers_color, IDD=None):
+    def __init__(self, markers_color, IDD=None, port=None):
         self.markers_color = markers_color
         self.IDD = IDD
+        self.port = port
+    ################################################################################################################################################
+    def load_markers(self, dataset_name, file_name, window_length=11):   
+      
+        # Load raw data 
+        markers_file_path = get_markers_file_path(dataset_name, file_name)  
+        raw_df  = pd.read_csv(
+            markers_file_path,                                                  # relative python path to subdirectory
+            usecols = ['time', self.markers_color],                             # Only load the three columns specified.
+            parse_dates = ['time'] ) 
+        self.markers = pd.DataFrame()
 
-        self.markers = None
-        self.rssi = None
+        # DON'T USE!! markers are switched and smoothing causes error    
+        # Processing
+        # self.markers = self.markers.rolling(window_length, axis=0).mean()    # Gap filling
+        # self.markers = self.markers.ffill(axis=0).bfill(axis=0)              # Smoothing
+
+        # Time
+        date_time = pd.to_datetime( raw_df['time'] , format=datime_format)
+        self.markers['time'] = [ np.round( (datetime.combine(date.min, t.time())-datetime.min).total_seconds(), 2) for t in date_time]
+        
+        # Markers
+        self.markers['markers'] = [list(map(float, l.replace(']','').replace('[','').replace('\n','').split(", "))) for l in raw_df[self.markers_color].values]        
+        return
     ################################################################################################################################################
     def load_rssi(self, dataset_name, file_name, window_length=11):
         # Load data 
-        rssi_file_path = get_rssi_file_path(dataset_name, file_name)       
+        rfid_file_path = get_rfid_file_path(dataset_name, file_name)       
         raw_df = pd.read_csv(
-            rssi_file_path,                                                     # relative python path to subdirectory
+            rfid_file_path,                                                     # relative python path to subdirectory
             delimiter  = ';',                                                   # Tab-separated value file.
             usecols = ['IDD', 'Time', 'Ant/RSSI'],                              # Only load the three columns specified.
             parse_dates = ['Time'] )                                            # Intepret the birth_date column as a date      
@@ -37,37 +49,22 @@ class NODE(object):
         raw_df = raw_df.loc[ raw_df['IDD'] == self.IDD, :]
         self.rssi = pd.DataFrame({ 'rssi': raw_df['Ant/RSSI'].str.replace('Ant.No 1 - RSSI: ', '').astype(int) })
 
-        # # Processing
+        # Processing
         self.rssi = self.rssi.rolling(window_length, axis=0).median()   # Smoothing
         self.rssi = self.rssi.ffill(axis=0).bfill(axis=0)               # Gap Filling
          
         # Time
         date_time = pd.to_datetime( raw_df['Time'] , format=datime_format)
         self.rssi['time'] = [ np.round( (datetime.combine(date.min, t.time())-datetime.min).total_seconds(), 2) for t in date_time]
-
         return
     ################################################################################################################################################
-    def load_markers(self, dataset_name, file_name, window_length=11):   
-      
-        # Load raw data 
-        motion_file_path = get_markers_file_path(dataset_name, file_name + '_' + self.markers_color)  
-        self.markers = pd.read_csv( motion_file_path, delimiter="\t", header=None, dtype=np.float64)
-                
-        # Processing
-        self.markers = self.markers.rolling(window_length, axis=0).mean()    # Gap filling
-        self.markers = self.markers.ffill(axis=0).bfill(axis=0)              # Smoothing
-
-        # Time
-        time_file_path = get_time_file_path(dataset_name, file_name)    
-        with open(time_file_path , 'r') as f:  lines = f.read().splitlines() 
-        date_time = pd.to_datetime( lines , format=datime_format)
-        self.markers['time'] = [ (datetime.combine(date.min, t.time())-datetime.min).total_seconds() for t in date_time]
-        
-        return
+    def load_vind(self, dataset_name, file_name, window_length=11):
+        pass
     ################################################################################################################################################
     def shift_time(self, shift):
         self.markers.time -= shift
-        if self.rssi is not None: self.rssi.time -= shift
+        if self.IDD is not None: self.rssi.time -= shift
+        if self.port is not None: self.rssi.time -= shift
         return
     ################################################################################################################################################
     def center(self, window_length=7, polyorder=1):
@@ -75,19 +72,21 @@ class NODE(object):
         markers_npy = markers_npy.reshape(np.shape(markers_npy)[0], -1, 3)
         center = np.mean(markers_npy, axis=1) 
         
+        center = np.nan_to_num(center)
         center = signal.savgol_filter( center, window_length=window_length, polyorder=polyorder, axis=0)            
         return center
     ################################################################################################################################################    
     def norm(self, window_length=7, polyorder=1):
         markers_npy = self.markers.drop(['time'], axis=1).to_numpy()
-        # markers_npy = signal.savgol_filter( markers_npy, window_length=window_length, polyorder=polyorder, axis=0)  
 
         markers_npy =  markers_npy.reshape(np.shape(markers_npy)[0], -1, 3)
         v1 = markers_npy[:,1,:] - markers_npy[:,0,:]
         v2 = markers_npy[:,2,:] - markers_npy[:,0,:] 
         norm = np.cross( v1, v2)
         # norm[ norm[:,2]<0, :] *= -1 
-        norm = signal.savgol_filter( norm, window_length=window_length, polyorder=polyorder, axis=0)  
+
+        # norm = np.nan_to_num(norm)
+        # norm = signal.savgol_filter( norm, window_length=window_length, polyorder=polyorder, axis=0)  
         norm = norm / ( np.reshape(np.linalg.norm(norm, axis=1), (-1,1)) * np.ones((1,3))) 
         return norm
 ####################################################################################################################################################
@@ -130,53 +129,69 @@ class SYSTEM(object):
         
         return
     ################################################################################################################################################
-    def get_rssi_data(self, window_length=11):
+    def get_rssi_data(self, window_length=11, polyorder=1):
         rssi = pd.DataFrame({'time':self.tags[0].rssi.time})
         for i, tag in enumerate(self.tags):
             tag_rssi = sys.tags[i].rssi.rename({'rssi':'rssi_'+str(i)}, axis=1)
             rssi = rssi.merge( tag_rssi, on='time', how='outer', suffixes=('', ''), sort=True )               
+ 
+        # RSSI data status
+        status = pd.DataFrame({'time':rssi.time})
+        for column in rssi.columns:
+            if column != 'time': status[column.replace('rssi','status')] = np.isnan(rssi[column].values)
+        
+        # # Smoothing
+        rssi.loc[:, rssi.columns != 'time'] = rssi.loc[:, rssi.columns != 'time'].rolling(window_length, axis=0).mean().fillna(method='ffill', axis=0).bfill(axis=0)      
+        for col in rssi.columns:
+            if col != 'time': rssi.loc[:,col]= signal.savgol_filter( rssi.loc[:,col], window_length=window_length, polyorder=polyorder) 
 
-        return rssi        
+        return rssi, status       
     ################################################################################################################################################
-    def get_motion_data(self, window_length=11):   
+    def get_motion_data(self, window_length=11, polyorder=1):   
         # Modify this function for different targeted movements
         motion = pd.DataFrame({'time':self.reader.markers.time})
 
         N = 10
         ref_center = self.reader.center()
-        ref_norm = self.reader.norm()            
         ref_center = np.ones(np.shape(ref_center)) * np.mean(ref_center[:N], axis=0)
-        ref_norm = np.ones(np.shape(ref_norm)) * np.mean(ref_norm[:N], axis=0)
 
+        ref_norm = self.reader.norm()     
+        ref_norm =  np.mean(ref_norm[:N], axis=0)
+        ref_norm = ref_norm / np.linalg.norm(ref_norm)
+        ref_norm = np.ones(np.shape(ref_norm)) * ref_norm
+
+        
         for i, tag in enumerate(self.tags):
-            motion['distance_'+str(i)] = np.linalg.norm( ref_center - tag.center(), axis=1)
-            motion['misalignment_'+str(i)] = np.arcsin(np.linalg.norm(np.cross(ref_norm, tag.norm()), axis=1)) *180/np.pi
-            # motion['misalignment_'+str(i)] = np.arccos(np.abs(np.sum(np.multiply( ref_norm, tag.norm()), axis=1))) * 180/np.pi 
+            distance_vec = ref_center - tag.center()
+            distance = np.linalg.norm( distance_vec, axis=1)
+            lat_misalignment = np.sqrt(distance**2 - np.sum(np.multiply( distance_vec, ref_norm), axis=1)**2)           
+            ang_misalignment = np.arcsin( np.linalg.norm(np.cross(ref_norm, tag.norm()), axis=1) )*180/np.pi
+            
+            motion['distance_'+str(i)] = signal.savgol_filter( distance, window_length=window_length, polyorder=polyorder, axis=0)                        
+            motion['lat_misalignment_'+str(i)] = signal.savgol_filter( lat_misalignment, window_length=window_length, polyorder=polyorder, axis=0)        
+            motion['ang_misalignment_'+str(i)] = signal.savgol_filter( ang_misalignment, window_length=window_length, polyorder=polyorder, axis=0)        
+
+        # ang_misalignment = np.arcsin( np.mean([ np.linalg.norm(np.cross(ref_norm, tag.norm()), axis=1) for tag in self.tags],0) )*180/np.pi
+        # motion['ang_misalignment'] = signal.savgol_filter( ang_misalignment, window_length=window_length, polyorder=polyorder, axis=0)        
 
         return motion
     ################################################################################################################################################
     def get_data(self, window_length=11, save=False,  data_status=False):
-        rssi = self.get_rssi_data()
-        motion = self.get_motion_data()
+        rssi, status = self.get_rssi_data()
+        motion = self.get_motion_data()       
+    
+        data = pd.DataFrame({'time':rssi.time})
+        data = data.merge( motion, on='time', how='outer', suffixes=('', ''), sort=True )
+        data = data.interpolate(method='nearest')        
+        data.loc[:, data.columns!='time'] = data.loc[:, data.columns!='time'].rolling(window_length, axis=0).mean().fillna(method='ffill', axis=0).bfill(axis=0)      
         
-        # RSSI data status
-        status = pd.DataFrame({'time':rssi.time})
-        for column in rssi.columns:
-            if column != 'time': status[column.replace('rssi','status')] = np.isnan(rssi[column].values)
+        data = data.merge(rssi, on='time', how='inner', suffixes=('', ''), sort=True)
+        data = data.merge(status, on='time', how='inner', suffixes=('', ''), sort=True)
 
         time = rssi.time
         time = time[ motion.time.iloc[0] < time]
         time = time[ time < motion.time.iloc[-1] ]
-
-        data = rssi.merge( motion, on='time', how='outer', suffixes=('', ''), sort=True )
-        data = data.interpolate(method='nearest')        
         data = data.merge( time, on='time', how='inner', suffixes=('', ''), sort=True )
-
-        data = data.rolling(window_length, axis=0).mean().fillna(method='ffill', axis=0).bfill(axis=0)      
-        data['time'] = time.values
-        
-        
-        data = data.merge(status, on='time', how='inner', suffixes=('', ''), sort=True)
 
         if save:
             dataset_file_path = get_dataset_file_path(self.dataset_name, self.file_name)
@@ -191,96 +206,42 @@ class SYSTEM(object):
 ####################################################################################################################################################
 if __name__ == '__main__':
 
-    dataset_name = 'dataset_03'    
+    dataset_name = 'dataset_04'    
+    doPlot = True
+    doSave = False
 
     rfid_info = get_rfid_info(dataset_name)    
     sys = SYSTEM(system_info=rfid_info)
-    
-    for n in range(18):
+
+    for n in range(4):
         file_name = 'record_' + "{0:0=2d}".format(n)
-        sys.load(dataset_name, file_name)
+        sys.load(dataset_name, file_name)        
+        data = sys.get_data(save=doSave)
 
-        data = sys.get_data(save=True)
+        if doPlot:
+            fig, axs = plt.subplots(5,1)  
+            axs[0].title.set_text(file_name)
 
-        # fig, axs = plt.subplots(4,1)     
-        # data.plot(x='time', y='distance_0', ax=axs[0])
-        # data.plot(x='time', y='distance_1', ax=axs[0])
-        # data.plot(x='time', y='misalignment_0', ax=axs[1])
-        # data.plot(x='time', y='misalignment_1', ax=axs[1])
-        # data.plot(x='time', y='rssi_0', ax=axs[2])
-        # data.plot(x='time', y='rssi_1', ax=axs[2])
-        # axs[3].plot(data.status_0)
-        # axs[3].plot(data.status_1)
+            data.plot(x='time', y='distance_0', ax=axs[0])
+            data.plot(x='time', y='distance_1', ax=axs[0])
+            axs[0].set_ylim([0, 1])
 
-        # axs[0].title.set_text(file_name)
-        # plt.show()
+            data.plot(x='time', y='lat_misalignment_0', ax=axs[1])
+            data.plot(x='time', y='lat_misalignment_1', ax=axs[1])
+            axs[1].set_ylim([0, .5])
 
+            data.plot(x='time', y='ang_misalignment_0', ax=axs[2])
+            data.plot(x='time', y='ang_misalignment_1', ax=axs[2])
+            axs[2].set_ylim([0, 90])
+
+            data.plot(x='time', y='rssi_0', ax=axs[3])
+            data.plot(x='time', y='rssi_1', ax=axs[3])
+            axs[3].set_ylim([50, 150])
+
+            axs[4].plot(data.status_0)
+            axs[4].plot(data.status_1)
+
+            plt.show()
 ####################################################################################################################################################
 
    
-
-# ####################################################################################################################################################
-# if __name__ == '__main__':
-
-#     dataset_name = 'dataset_03'    
-
-#     rfid_info = get_rfid_info(dataset_name)
-#     sys = SYSTEM( system_info=rfid_info )
-
-#     for n in range(18):
-#         file_name = 'record_' + "{0:0=2d}".format(n)
-#         sys.load(dataset_name, file_name) 
-#         data = sys.get_data(save=True)   
-#         print(file_name)
-# # ###################################################################################################################################################
-
-
-# ####################################################################################################################################################
-# if __name__ == '__main__':
-
-#     dataset_name = 'dataset_04'    
-
-#     rfid_info = get_rfid_info(dataset_name)    
-#     sys = SYSTEM(system_info=rfid_info)
-    
-#     for n in range(1):
-#         file_name = 'record_' + "{0:0=2d}".format(n)
-#         print(sys.tags[0].markers_color)
-#         sys.reader.load_markers(dataset_name, file_name)
-#         sys.tags[0].load_markers(dataset_name, file_name)
-#         sys.tags[1].load_markers(dataset_name, file_name)
-#         sys.tags[1].markers.plot(x='time')
-        # sys.load(dataset_name, file_name)     
-        
-        # rssi = sys.get_rssi_data()
-        # motion = sys.get_motion_data()
-        # data = sys.get_data()
-
-        # fig, axs = plt.subplots(3,1)
-            
-        # motion.plot(x='time', y='distance_0', ax=axs[0])
-        # motion.plot(x='time', y='distance_1', ax=axs[0])
-        # data.plot(x='time', y='distance_0', ax=axs[0])
-        # data.plot(x='time', y='distance_1', ax=axs[0])
-
-        # motion.plot(x='time', y='misalignment_0', ax=axs[1])
-        # motion.plot(x='time', y='misalignment_1', ax=axs[1])
-        # data.plot(x='time', y='misalignment_0', ax=axs[1])
-        # data.plot(x='time', y='misalignment_1', ax=axs[1])
-
-        # sys.tags[0].rssi.plot(x='time', y='rssi', ax=axs[2])
-        # sys.tags[1].rssi.plot(x='time', y='rssi', ax=axs[2])
-        # rssi.plot(x='time', y='rssi_0', ax=axs[2])
-        # rssi.plot(x='time', y='rssi_1', ax=axs[2])
-        # data.plot(x='time', y='rssi_0', ax=axs[2])
-        # data.plot (x='time', y='rssi_1', ax=axs[2])
-        # plt.show()
-
-        # dt0 = np.diff (sys.tags[0].rssi.time.to_numpy()) 
-        # plt.scatter( np.arange(len(dt0)), dt0)
-        # plt.scatter(np.arange(len(dt1)), dt1)
-        # plt.show()
-###################################################################################################################################################
-
-   
-    
