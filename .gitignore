@@ -6,3 +6,4 @@ __pycache__/
 *.jpeg
 *.png
 *.PNG
+.DS_Store
