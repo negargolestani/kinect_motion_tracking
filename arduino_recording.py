@@ -4,7 +4,7 @@ import serial
 
 ####################################################################################################################################################
 class ARDUINO(object):
-    def __init__(self, baudrate=9600, *ports):
+    def __init__(self, ports, baudrate=9600):
         sels.sers = list()
         for i, port in enumerate(ports):
             ser = serial.Serial(port, baudrate=baudrate)
@@ -33,8 +33,10 @@ if __name__ == '__main__':
     record_time = 50
 
     # Initialization
-    arduino = ARDUINO()   
-
+    arduino = ARDUINO([ 
+        '/dev/cu.usbserial-1420',
+        '/dev/cu.usbserial-1420'
+        ])   
     arduino_file_path = get_arduino_file_path(dataset_name, file_name)
     create_folder(arduino_file_path)
     data_df = pd.DataFrame()
@@ -52,4 +54,3 @@ if __name__ == '__main__':
     data_df.to_csv(arduino_file_path, index=False)        
     print('Done!')           
 ################################################################################################################################################
-        
