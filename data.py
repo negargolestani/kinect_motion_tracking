@@ -13,6 +13,12 @@ class NODE(object):
         self.IDD = IDD
         self.port = port
     ################################################################################################################################################
+    def load(self, dataset_name, file_name, window_length=11):
+        self.load_markers(dataset_name, file_name, window_length=window_length)        
+        if self.IDD is not None: self.load_rssi(dataset_name, file_name, window_length=window_length)
+        if self.port is not None: self.load_vind(dataset_name, file_name, window_length=window_length)
+        return 
+    ################################################################################################################################################
     def load_markers(self, dataset_name, file_name, window_length=11):   
       
         # Load raw data 
@@ -59,7 +65,20 @@ class NODE(object):
         return
     ################################################################################################################################################
     def load_vind(self, dataset_name, file_name, window_length=11):
-        pass
+        # Load data 
+        arduino_file_path = get_arduino_file_path(dataset_name, file_name)               
+        raw_df = pd.read_csv(arduino_file_path)
+
+        self.vind = raw_df
+
+        # Processing
+        self.vind = self.rssi.rolling(window_length, axis=0).median()   # Smoothing
+        self.vind = self.rssi.ffill(axis=0).bfill(axis=0)               # Gap Filling
+         
+        # Time
+        date_time = pd.to_datetime( raw_df['time'] , format=datime_format)
+        self.vind['time'] = [ np.round( (datetime.combine(date.min, t.time())-datetime.min).total_seconds(), 2) for t in date_time]
+        return
     ################################################################################################################################################
     def shift_time(self, shift):
         self.markers.time -= shift
@@ -90,6 +109,7 @@ class NODE(object):
         norm = norm / ( np.reshape(np.linalg.norm(norm, axis=1), (-1,1)) * np.ones((1,3))) 
         return norm
 ####################################################################################################################################################
+####################################################################################################################################################
 class SYSTEM(object):
     ################################################################################################################################################
     def __init__(self, system_info = None):
@@ -107,8 +127,8 @@ class SYSTEM(object):
         self.reader = NODE( reader_markers_color )
         return
     ################################################################################################################################################
-    def add_tag(self, markers_color, IDD):
-        self.tags.append( NODE(markers_color, IDD) )   
+    def add_tag(self, markers_color, IDD=None, port=None):
+        self.tags.append( NODE(markers_color, IDD=IDD, port=port) )   
         return               
     ################################################################################################################################################
     def load(self, dataset_name, file_name):
@@ -116,12 +136,11 @@ class SYSTEM(object):
         self.file_name = file_name
 
         # Loading + time shift
-        self.reader.load_markers(dataset_name, file_name) 
+        self.reader.load(dataset_name, file_name) 
         start_time = self.reader.markers.time.iloc[0]
 
         for i,tag in enumerate(self.tags):            
-            self.tags[i].load_markers(dataset_name, file_name)
-            self.tags[i].load_rssi(dataset_name, file_name) 
+            self.tags[i].load(dataset_name, file_name)
             start_time = min( start_time, tag.rssi.time.iloc[0])
 
         self.reader.shift_time(start_time)    
