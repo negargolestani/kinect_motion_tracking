@@ -53,10 +53,10 @@ def get_result_file_path(file_name):
 def get_color_setting_file_path(dataset_name, file_name):
     return main_directory + '/' + dataset_folder_name +  '/' + dataset_name  + '/calibration_setting/' + file_name + '.pickle'
 ####################################################################################################################################################
-def get_rfid_info(dataset_name):
-    file_path = main_directory + '/' + dataset_folder_name +  '/' + dataset_name  + '/calibration_setting/rfid_info.txt'
-    with open(file_path , 'r') as f: rfid_info = dict(x.rstrip().split(None, 1) for x in f)
-    return rfid_info
+def get_sys_info(dataset_name):
+    file_path = main_directory + '/' + dataset_folder_name +  '/' + dataset_name  + '/calibration_setting/sys_info.txt'
+    sys_info = pd.read_csv(file_path, delimiter='\t')
+    return sys_info
 ####################################################################################################################################################
 
 

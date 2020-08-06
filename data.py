@@ -140,10 +140,15 @@ class SYSTEM(object):
         self.tags = list()
 
         if system_info is not None:
-            system_info_ = system_info.copy()
-            reader_markers_color = system_info_.pop('reader')
-            self.add_reader(reader_markers_color)
-            for IDD,markers_color in system_info_.items(): self.add_tag(markers_color, IDD)
+            
+            for idx in sys_info.index:                
+                node_info = sys_info.loc[idx, sys_info.columns!='type'].to_dict()                
+                for key,value in node_info.items():
+                    if value == 'None': node_info.update({key: None})
+                
+                node = NODE( **node_info )
+                if sys_info.loc[idx, 'type'] == 'tag': self.tags.append(node)
+                else: self.reader = node
         return
     ################################################################################################################################################
     def add_reader(self, reader_markers_color):
@@ -189,8 +194,8 @@ if __name__ == '__main__':
     doPlot = False
     doSave = True
 
-    rfid_info = get_rfid_info(dataset_name)    
-    sys = SYSTEM(system_info=rfid_info)
+    sys_info = get_sys_info(dataset_name)    
+    sys = SYSTEM(system_info=sys_info)
 
     for n in range(30):
         file_name = 'record_' + "{0:0=2d}".format(n)
