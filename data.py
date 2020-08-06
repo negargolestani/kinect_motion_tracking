@@ -1,6 +1,7 @@
 from utils import*
 
 
+
 ####################################################################################################################################################
 class NODE(object):
     ################################################################################################################################################
@@ -71,7 +72,7 @@ class NODE(object):
 
         # Distance
         distance = np.linalg.norm( distance_vec, axis=1)
-        distance = signal.savgol_filter( distance, window_length=window_length, polyorder=polyorder, axis=0)                        
+        distance = signal.savgol_filter( distance, window_length=window_length, polyorder=1, axis=0)                        
 
         # Lateral Misalignment
         lat_misalignment = np.sqrt(distance**2 - np.sum(np.multiply( distance_vec, ref_norm), axis=1)**2)           
@@ -158,56 +159,29 @@ class SYSTEM(object):
         self.tags.append( NODE(markers_color, IDD=IDD, port=port) )   
         return               
     ################################################################################################################################################
-    def get_data(self, dataset_name, file_name):
-        
-        reader_data = self.reader.get_data(dataset_name, file_name)        
+    def get_data(self, dataset_name, file_name, save=False, window_length=11):
+        reader_data = self.reader.get_data(dataset_name, file_name)  
         data = pd.DataFrame({'time':reader_data.time})
 
         for i, tag in enumerate(self.tags):
             tag_data = tag.get_data(dataset_name, file_name, ref_node_data=reader_data)
-            data = data.merge( tag_data, on='time', how='outer', suffixes=('', '_'+str(i)), sort=True )
-        return data
-    ################################################################################################################################################
-    def get_rssi_data_(self, window_length=11, polyorder=1):
-        rssi = pd.DataFrame({'time':self.tags[0].rssi.time})
-        for i, tag in enumerate(self.tags):
-            tag_rssi = sys.tags[i].rssi.rename({'rssi':'rssi_'+str(i)}, axis=1)
-            rssi = rssi.merge( tag_rssi, on='time', how='outer', suffixes=('', ''), sort=True )               
- 
-        # RSSI data status
-        status = pd.DataFrame({'time':rssi.time})
-        for column in rssi.columns:
-            if column != 'time': status[column.replace('rssi','status')] = np.isnan(rssi[column].values)
-        
-        # # Smoothing
-        rssi.loc[:, rssi.columns != 'time'] = rssi.loc[:, rssi.columns != 'time'].rolling(window_length, axis=0).mean().fillna(method='ffill', axis=0).bfill(axis=0)      
-        for col in rssi.columns:
-            if col != 'time': rssi.loc[:,col]= signal.savgol_filter( rssi.loc[:,col], window_length=window_length, polyorder=polyorder) 
+            tag_data = tag_data.add_suffix('_'+str(i)).rename({'time_'+str(i):'time'}, axis='columns')
+            data = data.merge( tag_data, on='time', how='outer', suffixes=('', '' ), sort=True )
 
-        return rssi, status       
-    ################################################################################################################################################
-    def get_data_(self, window_length=11, save=False,  data_status=False):
-        rssi, status = self.get_rssi_data()
-        motion = self.get_motion_data()       
     
-        data = pd.DataFrame({'time':rssi.time})
-        data = data.merge( motion, on='time', how='outer', suffixes=('', ''), sort=True )
+        # Select specific time samples 
+        target_time = data.time[ np.where(np.any( ~np.isnan(data.filter(regex='rssi', axis=1)), axis=1))[0] ]   # time samples that at least one rssi is not Nan
         data = data.interpolate(method='nearest')        
         data.loc[:, data.columns!='time'] = data.loc[:, data.columns!='time'].rolling(window_length, axis=0).mean().fillna(method='ffill', axis=0).bfill(axis=0)      
-        
-        data = data.merge(rssi, on='time', how='inner', suffixes=('', ''), sort=True)
-        data = data.merge(status, on='time', how='inner', suffixes=('', ''), sort=True)
-
-        time = rssi.time
-        time = time[ motion.time.iloc[0] < time]
-        time = time[ time < motion.time.iloc[-1] ]
-        data = data.merge( time, on='time', how='inner', suffixes=('', ''), sort=True )
-
+        data = data.merge( pd.DataFrame({'time':target_time}), on='time', how='inner', suffixes=('', '' ), sort=True )
+     
+        # Save
         if save:
-            dataset_file_path = get_dataset_file_path(self.dataset_name, self.file_name)
+            dataset_file_path = get_dataset_file_path(dataset_name, file_name)
             create_folder(dataset_file_path)
-            data.to_pickle( dataset_file_path )  
+            data.to_csv( dataset_file_path, index=False)  
             print(self.file_name, 'is saved.')
+
         return data
 ####################################################################################################################################################
 
@@ -216,20 +190,19 @@ class SYSTEM(object):
 ####################################################################################################################################################
 if __name__ == '__main__':
 
-    dataset_name = 'dataset_04'    
+    dataset_name = 'dataset_05'    
     doPlot = True
     doSave = False
 
     rfid_info = get_rfid_info(dataset_name)    
     sys = SYSTEM(system_info=rfid_info)
 
-    for n in range(4):
+    for n in range(1):
         file_name = 'record_' + "{0:0=2d}".format(n)
-        sys.load(dataset_name, file_name)        
-        data = sys.get_data(save=doSave)
+        data = sys.get_data(dataset_name, file_name, save=doSave)
 
         if doPlot:
-            fig, axs = plt.subplots(5,1)  
+            fig, axs = plt.subplots(4,1)  
             axs[0].title.set_text(file_name)
 
             data.plot(x='time', y='distance_0', ax=axs[0])
@@ -238,7 +211,7 @@ if __name__ == '__main__':
 
             data.plot(x='time', y='lat_misalignment_0', ax=axs[1])
             data.plot(x='time', y='lat_misalignment_1', ax=axs[1])
-            axs[1].set_ylim([0, .5])
+            axs[1].set_ylim([0, .6])
 
             data.plot(x='time', y='ang_misalignment_0', ax=axs[2])
             data.plot(x='time', y='ang_misalignment_1', ax=axs[2])
@@ -248,8 +221,6 @@ if __name__ == '__main__':
             data.plot(x='time', y='rssi_1', ax=axs[3])
             axs[3].set_ylim([50, 150])
 
-            axs[4].plot(data.status_0)
-            axs[4].plot(data.status_1)
 
             plt.show()
 ####################################################################################################################################################
