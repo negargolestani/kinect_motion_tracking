@@ -30,10 +30,6 @@ class NODE(object):
             usecols = ['time', self.markers_color],                             # Only load the three columns specified.
             parse_dates = ['time'] ) 
         
-        # DON'T USE!! markers are switched and smoothing causes error    
-        # Processing
-        # self.markers = self.markers.rolling(window_length, axis=0).mean()    # Gap filling
-        # self.markers = self.markers.ffill(axis=0).bfill(axis=0)              # Smoothing
 
         # Time
         date_time = pd.to_datetime( raw_df['time'] , format=datime_format)
@@ -42,20 +38,19 @@ class NODE(object):
         # Markers
         markers = [list(map(float, l.replace(']','').replace('[','').replace('\n','').split(", "))) for l in raw_df[self.markers_color].values]  
         markers_npy = np.array(markers).reshape(len(time), -1, 3)
+        # DON'T Smooth markers. markers can be switched in array and smoothing causes error    
 
         # Center    
         center = np.mean(markers_npy, axis=1)         
         center = np.nan_to_num(center)
-        center = signal.savgol_filter( center, window_length=window_length, polyorder=1, axis=0)            
-        
+        center = signal.savgol_filter( center, window_length=window_length, polyorder=1, axis=0)     
+
         # Norm
         norm = np.cross( markers_npy[:,1,:] - markers_npy[:,0,:], markers_npy[:,2,:] - markers_npy[:,0,:])
-        # norm[ norm[:,2]<0, :] *= -1 
-        norm = np.nan_to_num(norm)
-        # norm = signal.savgol_filter( norm, window_length=window_length, polyorder=1, axis=0)  
+        # norm[ norm[:,2]<0, :] *= -1   # Don't use ! 
         norm = norm / ( np.reshape(np.linalg.norm(norm, axis=1), (-1,1)) * np.ones((1,3)))
+        # DOn't smooth norm 
 
-        # Relative movements 
         if ref_node_data is None:            
             return pd.DataFrame({
                 'time': time,
@@ -63,23 +58,23 @@ class NODE(object):
                 'center': list(center), 
                 'norm': list(norm)
                 })    
-                   
+
+        ############################
+        #### Relative Movements ####
+
+        # Reader center/norm     
         N = 10
         ref_center = np.tile( np.mean(ref_node_data.center.loc[:N], axis=0), (len(ref_node_data),1) )
         ref_norm = np.tile( np.mean(ref_node_data.norm.loc[:N], axis=0), (len(ref_node_data),1) )            
+        
+        distance_vec = ref_center - center                                                                  # Distance (vector)        
+        distance = np.linalg.norm( distance_vec, axis=1)                                                    # Distance
+        lat_misalignment = np.sqrt(distance**2 - np.sum(np.multiply( distance_vec, ref_norm), axis=1)**2)   # Lateral Misalignment                   
+        ang_misalignment = np.arcsin( np.linalg.norm(np.cross(ref_norm, norm), axis=1) )*180/np.pi          # Angular Misalignment
 
-        distance_vec = ref_center - center
-
-        # Distance
-        distance = np.linalg.norm( distance_vec, axis=1)
+        # Smoothing (smooth these params after all calculation)               
         distance = signal.savgol_filter( distance, window_length=window_length, polyorder=1, axis=0)                        
-
-        # Lateral Misalignment
-        lat_misalignment = np.sqrt(distance**2 - np.sum(np.multiply( distance_vec, ref_norm), axis=1)**2)           
         lat_misalignment = signal.savgol_filter( lat_misalignment, window_length=window_length, polyorder=1, axis=0)        
-
-        # Angular Misalignment
-        ang_misalignment = np.arcsin( np.linalg.norm(np.cross(ref_norm, norm), axis=1) )*180/np.pi
         ang_misalignment = signal.savgol_filter( ang_misalignment, window_length=window_length, polyorder=1, axis=0)  
 
         return pd.DataFrame({
@@ -179,8 +174,8 @@ class SYSTEM(object):
         if save:
             dataset_file_path = get_dataset_file_path(dataset_name, file_name)
             create_folder(dataset_file_path)
-            data.to_csv( dataset_file_path, index=False)  
-            print(self.file_name, 'is saved.')
+            data.to_pickle( dataset_file_path)  
+            print(file_name, 'is saved.')
 
         return data
 ####################################################################################################################################################
@@ -190,14 +185,14 @@ class SYSTEM(object):
 ####################################################################################################################################################
 if __name__ == '__main__':
 
-    dataset_name = 'dataset_05'    
-    doPlot = True
-    doSave = False
+    dataset_name = 'dataset_01'    
+    doPlot = False
+    doSave = True
 
     rfid_info = get_rfid_info(dataset_name)    
     sys = SYSTEM(system_info=rfid_info)
 
-    for n in range(1):
+    for n in range(30):
         file_name = 'record_' + "{0:0=2d}".format(n)
         data = sys.get_data(dataset_name, file_name, save=doSave)
 
