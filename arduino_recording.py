@@ -5,6 +5,7 @@ import serial
 ####################################################################################################################################################
 class ARDUINO(object):
     def __init__(self, ports, baudrate=9600):
+        self.ports = ports
         self.sers = list()
         for i, port in enumerate(ports):
             ser = serial.Serial(port, baudrate=baudrate)
@@ -13,14 +14,10 @@ class ARDUINO(object):
             self.sers.append(ser)
         return
     ################################################################################################################################################
-    def read(self, scale=5/1024, return_as_dict=False):
-        time = datetime.now().time()
-        vind = [float(ser.readline().decode()) * scale for ser in self.sers]
-
-        self.time = time
-        self.vind = vind
-
-        if return_as_dict: return dict({ 'time':time, 'vind':vind })
+    def read(self, scale=5/1024):
+        self.time = datetime.now().time()
+        self.vind = [float(ser.readline().decode()) * scale for ser in self.sers]
+        return 
 ####################################################################################################################################################
         
 
@@ -48,7 +45,10 @@ if __name__ == '__main__':
     # Recording loop
     start_time = datetime.combine(date.min, arduino.time)
     while cv2.waitKey(1)!=27 and (datetime.combine(date.min, arduino.time) - start_time).total_seconds() < record_time:  
-        data_dict = arduino.read(return_as_dict=True)
+        arduino.read()
+
+        data_dict = dict({'time':arduino.time})
+        for (port,vind) in zip(arduino.ports, arduino.vind): data_dict.update({ port:vind }) 
         data_df = data_df.append( data_dict , ignore_index=True)
 
     print('Recording is Finished \n Wait for Saving ...')    
