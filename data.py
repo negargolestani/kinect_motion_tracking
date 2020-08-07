@@ -170,7 +170,10 @@ class SYSTEM(object):
 
     
         # Select specific time samples 
-        target_time = data.time[ np.where(np.any( ~np.isnan(data.filter(regex='rssi', axis=1)), axis=1))[0] ]   # time samples that at least one rssi is not Nan
+        if self.tags[0].IDD is not None: input_data_type = 'rssi'
+        if self.tags[0].port is not None: input_data_type = 'vind'
+        
+        target_time = data.time[ np.where(np.any( ~np.isnan(data.filter(regex=input_data_type, axis=1)), axis=1))[0] ]   # time samples that at least one rssi is not Nan
         data = data.interpolate(method='nearest')        
         data.loc[:, data.columns!='time'] = data.loc[:, data.columns!='time'].rolling(window_length, axis=0).mean().fillna(method='ffill', axis=0).bfill(axis=0)      
         data = data.merge( pd.DataFrame({'time':target_time}), on='time', how='inner', suffixes=('', '' ), sort=True )
@@ -190,14 +193,14 @@ class SYSTEM(object):
 ####################################################################################################################################################
 if __name__ == '__main__':
 
-    dataset_name = 'dataset_01'    
-    doPlot = False
+    dataset_name = 'dataset_05'    
+    doPlot = True
     doSave = True
 
     sys_info = get_sys_info(dataset_name)    
     sys = SYSTEM(system_info=sys_info)
 
-    for n in range(30):
+    for n in range(3):
         file_name = 'record_' + "{0:0=2d}".format(n)
         data = sys.get_data(dataset_name, file_name, save=doSave)
 
@@ -217,9 +220,13 @@ if __name__ == '__main__':
             data.plot(x='time', y='ang_misalignment_1', ax=axs[2])
             axs[2].set_ylim([0, 90])
 
-            data.plot(x='time', y='rssi_0', ax=axs[3])
-            data.plot(x='time', y='rssi_1', ax=axs[3])
-            axs[3].set_ylim([50, 150])
+            # data.plot(x='time', y='rssi_0', ax=axs[3])
+            # data.plot(x='time', y='rssi_1', ax=axs[3])
+            # axs[3].set_ylim([50, 150])
+
+            data.plot(x='time', y='vind_0', ax=axs[3])
+            data.plot(x='time', y='vind_1', ax=axs[3])
+            axs[3].set_ylim([0, 5])
 
 
             plt.show()
