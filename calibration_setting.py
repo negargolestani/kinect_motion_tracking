@@ -1,5 +1,5 @@
 from utils import*
-
+from kinect_recording import KINECT
 
 ####################################################################################################################################################
 def get_image( dataset_name, image_name ):
@@ -92,14 +92,14 @@ if __name__ == '__main__':
     # color_range_file_name = 'color_setting_default'                                             # pickle file name (saved output: color ranges)
         
 
-    dataset_name = 'dataset_04'
+    dataset_name = 'dataset_05'
     color_setting_name = 'color_setting_default'                                               # pickle file name (saved output: color ranges)
     color_setting_old_name = 'color_setting_default'
     
-    image_name = 'purple'                                                                 # png file name (input: reference image)
-    color_names = ['purple']                                                                        # color names from left to right of image (input)
+    image_name = 'blue'                                                                 # png file name (input: reference image)
+    color_names = ['blue']                                                                        # color names from left to right of image (input)
 
-    # get_image( image_name)                                                                      # Get Image
+    # get_image(dataset_name, image_name)                                                                      # Get Image
 
     new_colors_setting = get_color_setting(dataset_name, image_name,  color_names)  # get dict() of color ranges
 
