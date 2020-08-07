@@ -26,8 +26,8 @@ class ARDUINO(object):
 if __name__ == '__main__':
     
     dataset_name ='dataset_05'
-    file_name = 'record_00'
-    record_time = 40
+    file_name = 'record_04'
+    record_time = 60
 
     # Initialization
     arduino = ARDUINO([ 
