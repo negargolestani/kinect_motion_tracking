@@ -95,8 +95,6 @@ class NODE(object):
             delimiter  = ';',                                                   # Tab-separated value file.
             usecols = ['IDD', 'Time', 'Ant/RSSI'],                              # Only load the three columns specified.
             parse_dates = ['Time'] )                                            # Intepret the birth_date column as a date      
-
-        # self.rssi.loc[ self.rssi.IDD != self.IDD,'rssi'] = np.nan
         raw_df = raw_df.loc[ raw_df['IDD'] == self.IDD, :]
 
         # Time
@@ -105,7 +103,7 @@ class NODE(object):
         
         # RSSI
         # rssi_df = pd.DataFrame({ 'rssi': raw_df['Ant/RSSI'].str.replace('Ant.No 1 - RSSI: ', '').astype(int) })
-        rssi_df = raw_df['Ant/RSSI'].str.replace('Ant.No 1 - RSSI: ', '').astype(int) 
+        rssi_df = raw_df['Ant/RSSI'].str.replace('Ant.No 1 - RSSI: ', '').astype(float) 
         rssi_df = rssi_df.rolling(window_length, axis=0).median()   # Smoothing
         rssi_df = rssi_df.ffill(axis=0).bfill(axis=0)               # Gap Filling
 
@@ -118,20 +116,22 @@ class NODE(object):
         # Load data 
         arduino_file_path = get_arduino_file_path(dataset_name, file_name)               
         raw_df = pd.read_csv(arduino_file_path)
+        raw_df = raw_df.loc[ raw_df['port'] == self.port, :]
 
         # Time
         date_time = pd.to_datetime( raw_df['time'] , format=datime_format)
         time = [ np.round( (datetime.combine(date.min, t.time())-datetime.min).total_seconds(), 2) for t in date_time]
+        
+        # RSSI
+        # rssi_df = pd.DataFrame({ 'rssi': raw_df['Ant/RSSI'].str.replace('Ant.No 1 - RSSI: ', '').astype(int) })
+        vind_df = raw_df['vind'].astype(float) 
+        vind_df = vind_df.rolling(window_length, axis=0).median()   # Smoothing
+        vind_df = vind_df.ffill(axis=0).bfill(axis=0)               # Gap Filling
 
-        # V_induced (Vind)
-        vind = raw_df[self.port]
-        vind = vind.rolling(window_length, axis=0).median()   # Smoothing
-        vind = vind.ffill(axis=0).bfill(axis=0)               # Gap Filling
-         
         return pd.DataFrame({
             'time':time,
-            'vind':vind.tolist()
-        })
+            'vind':vind_df.tolist() 
+            })
 ########################################################################################################################################################################################################################################################################################################
 class SYSTEM(object):
     ################################################################################################################################################
