@@ -13,7 +13,7 @@ class NODE(object):
     def get_data(self, dataset_name, file_name, ref_node=None, window_length=11, ref_node_data=None):        
         
         data = self.get_motion(dataset_name, file_name, window_length=window_length, ref_node_data=ref_node_data, full_moiton_data=False)  
-        time = data.time
+        time = data.time    # use kinect time as ref time
 
         if self.IDD is not None: 
             rssi = self.get_rssi(dataset_name, file_name, window_length=window_length)
@@ -184,12 +184,15 @@ class SYSTEM(object):
             tag_data = tag_data.add_suffix('_'+str(i)).rename({'time_'+str(i):'time'}, axis='columns')
             data = data.merge( tag_data, on='time', how='outer', suffixes=('', '' ), sort=True )
 
+        data.interpolate(method='nearest', inplace=True)  
+        data.time -= data.time.loc[0]    
+
         # # Select specific time samples 
         # if self.tags[0].IDD is not None: input_data_type = 'rssi'
         # elif self.tags[0].port is not None: input_data_type = 'vind'        
         # target_time = data.time[ np.where(np.any( ~np.isnan(data.filter(regex=input_data_type, axis=1)), axis=1))[0] ]   # time samples that at least one rssi/vind is not Nan
         
-        data.interpolate(method='nearest', inplace=True)        
+        # data.interpolate(method='nearest', inplace=True)  
         # data.loc[:, data.columns!='time'] = data.loc[:, data.columns!='time'].rolling(window_length, axis=0).mean().fillna(method='ffill', axis=0).bfill(axis=0)      
         # data = data.merge( pd.DataFrame({'time':target_time}), on='time', how='inner', suffixes=('', '' ), sort=True )
      
