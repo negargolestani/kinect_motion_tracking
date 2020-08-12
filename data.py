@@ -1,5 +1,6 @@
 from utils import*
 
+import scipy.io as sio
 
 
 ####################################################################################################################################################
@@ -10,9 +11,9 @@ class NODE(object):
         self.IDD = IDD
         self.port = port
     ################################################################################################################################################
-    def get_data(self, dataset_name, file_name, ref_node=None, window_length=11, ref_node_data=None):        
+    def get_data(self, dataset_name, file_name, ref_node=None, window_length=11, ref_node_data=None, full_motion_data=False):        
         
-        data = self.get_motion(dataset_name, file_name, window_length=window_length, ref_node_data=ref_node_data, full_moiton_data=False)  
+        data = self.get_motion(dataset_name, file_name, window_length=window_length, ref_node_data=ref_node_data, full_motion_data=full_motion_data)  
         time = data.time    # use kinect time as ref time
 
         if self.IDD is not None: 
@@ -32,7 +33,7 @@ class NODE(object):
 
         return data
     ################################################################################################################################################
-    def get_motion(self, dataset_name, file_name, window_length=11, ref_node_data=None, full_moiton_data=False):   
+    def get_motion(self, dataset_name, file_name, window_length=11, ref_node_data=None, full_motion_data=False):   
         markers_file_path = get_markers_file_path(dataset_name, file_name)  
         raw_df  = pd.read_csv(
             markers_file_path,                                                  # relative python path to subdirectory
@@ -85,7 +86,7 @@ class NODE(object):
         lat_misalignment = signal.savgol_filter( lat_misalignment, window_length=window_length, polyorder=1, axis=0)        
         ang_misalignment = signal.savgol_filter( ang_misalignment, window_length=window_length, polyorder=1, axis=0)  
 
-        if full_moiton_data:
+        if full_motion_data:
             return pd.DataFrame({
                 'time': time,
                 'markers': markers,
@@ -212,13 +213,13 @@ class SYSTEM(object):
 if __name__ == '__main__':
 
     dataset_name = 'dataset_05'    
-    doPlot = True
+    doPlot = False
     doSave = False
 
     sys_info = get_sys_info(dataset_name)    
     sys = SYSTEM(system_info=sys_info)
 
-    for n in range(1):
+    for n in range(30):
         file_name = 'record_' + "{0:0=2d}".format(n)
         data = sys.get_data(dataset_name, file_name, save=doSave)
 
