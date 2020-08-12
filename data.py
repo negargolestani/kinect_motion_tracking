@@ -11,25 +11,33 @@ class NODE(object):
         self.port = port
     ################################################################################################################################################
     def get_data(self, dataset_name, file_name, ref_node=None, window_length=11, ref_node_data=None):        
-        data = self.get_motion(dataset_name, file_name, window_length=window_length, ref_node_data=ref_node_data)  
+        
+        data = self.get_motion(dataset_name, file_name, window_length=window_length, ref_node_data=ref_node_data, full_moiton_data=False)  
+        time = data.time
 
         if self.IDD is not None: 
             rssi = self.get_rssi(dataset_name, file_name, window_length=window_length)
-            data = data.merge( rssi, on='time', how='outer', suffixes=('', ''), sort=True )
+            data = data.merge( rssi, on='time', how='outer', suffixes=('', ''), sort=True)            
+            # t_start, t_end = max(t_start, rssi.time.iloc[0]), min(t_end,  rssi.time.iloc[-1])
+            time = time.loc[time> rssi.time.iloc[0]].loc[time< rssi.time.iloc[-1]]
 
         if self.port is not None: 
             vind = self.get_vind(dataset_name, file_name, window_length=window_length)
-            data = data.merge( vind, on='time', how='outer', suffixes=('', ''), sort=True )
+            data = data.merge( vind, on='time', how='outer', suffixes=('', ''), sort=True)
+            # t_start, t_end = max(t_start, vind.time.iloc[0]), min(t_end,  vind.time.iloc[-1])
+            time = time.loc[time> vind.time.iloc[0]].loc[time< vind.time.iloc[-1]]
+        
+        data.interpolate(method='nearest', axis=0, inplace=True)      
+        data = pd.merge( pd.DataFrame(time), data, on='time', how='inner', suffixes=('', ''), sort=True)
 
         return data
     ################################################################################################################################################
-    def get_motion(self, dataset_name, file_name, window_length=11, ref_node_data=None):   
+    def get_motion(self, dataset_name, file_name, window_length=11, ref_node_data=None, full_moiton_data=False):   
         markers_file_path = get_markers_file_path(dataset_name, file_name)  
         raw_df  = pd.read_csv(
             markers_file_path,                                                  # relative python path to subdirectory
             usecols = ['time', self.markers_color],                             # Only load the three columns specified.
-            parse_dates = ['time'] ) 
-        
+            parse_dates = ['time'] )         
 
         # Time
         date_time = pd.to_datetime( raw_df['time'] , format=datime_format)
@@ -77,15 +85,23 @@ class NODE(object):
         lat_misalignment = signal.savgol_filter( lat_misalignment, window_length=window_length, polyorder=1, axis=0)        
         ang_misalignment = signal.savgol_filter( ang_misalignment, window_length=window_length, polyorder=1, axis=0)  
 
-        return pd.DataFrame({
-            'time': time,
-            'markers': markers,
-            'center': list(center), 
-            'norm': list(norm),
-            'distance': list(distance),
-            'lat_misalignment': list(lat_misalignment),
-            'ang_misalignment': list(ang_misalignment)
-            })                 
+        if full_moiton_data:
+            return pd.DataFrame({
+                'time': time,
+                'markers': markers,
+                'center': list(center), 
+                'norm': list(norm),
+                'distance': list(distance),
+                'lat_misalignment': list(lat_misalignment),
+                'ang_misalignment': list(ang_misalignment)
+                })       
+        else:
+            return pd.DataFrame({
+                'time': time,
+                'distance': list(distance),
+                'lat_misalignment': list(lat_misalignment),
+                'ang_misalignment': list(ang_misalignment)
+                })                      
     ################################################################################################################################################
     def get_rssi(self, dataset_name, file_name, window_length=11):
         # Load data 
@@ -168,15 +184,14 @@ class SYSTEM(object):
             tag_data = tag_data.add_suffix('_'+str(i)).rename({'time_'+str(i):'time'}, axis='columns')
             data = data.merge( tag_data, on='time', how='outer', suffixes=('', '' ), sort=True )
 
-    
-        # Select specific time samples 
-        if self.tags[0].IDD is not None: input_data_type = 'rssi'
-        if self.tags[0].port is not None: input_data_type = 'vind'
+        # # Select specific time samples 
+        # if self.tags[0].IDD is not None: input_data_type = 'rssi'
+        # elif self.tags[0].port is not None: input_data_type = 'vind'        
+        # target_time = data.time[ np.where(np.any( ~np.isnan(data.filter(regex=input_data_type, axis=1)), axis=1))[0] ]   # time samples that at least one rssi/vind is not Nan
         
-        target_time = data.time[ np.where(np.any( ~np.isnan(data.filter(regex=input_data_type, axis=1)), axis=1))[0] ]   # time samples that at least one rssi is not Nan
-        data = data.interpolate(method='nearest')        
-        data.loc[:, data.columns!='time'] = data.loc[:, data.columns!='time'].rolling(window_length, axis=0).mean().fillna(method='ffill', axis=0).bfill(axis=0)      
-        data = data.merge( pd.DataFrame({'time':target_time}), on='time', how='inner', suffixes=('', '' ), sort=True )
+        data.interpolate(method='nearest', inplace=True)        
+        # data.loc[:, data.columns!='time'] = data.loc[:, data.columns!='time'].rolling(window_length, axis=0).mean().fillna(method='ffill', axis=0).bfill(axis=0)      
+        # data = data.merge( pd.DataFrame({'time':target_time}), on='time', how='inner', suffixes=('', '' ), sort=True )
      
         # Save
         if save:
@@ -195,12 +210,12 @@ if __name__ == '__main__':
 
     dataset_name = 'dataset_05'    
     doPlot = True
-    doSave = True
+    doSave = False
 
     sys_info = get_sys_info(dataset_name)    
     sys = SYSTEM(system_info=sys_info)
 
-    for n in range(3):
+    for n in range(1):
         file_name = 'record_' + "{0:0=2d}".format(n)
         data = sys.get_data(dataset_name, file_name, save=doSave)
 
@@ -226,7 +241,7 @@ if __name__ == '__main__':
 
             data.plot(x='time', y='vind_0', ax=axs[3])
             data.plot(x='time', y='vind_1', ax=axs[3])
-            axs[3].set_ylim([0, 5])
+            axs[3].set_ylim([0, 5.5])
 
 
             plt.show()
