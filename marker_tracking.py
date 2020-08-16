@@ -107,12 +107,12 @@ class RECORD(object):
 ################################################################################################################################################
 if __name__ == '__main__':
 
-    dataset_name = 'dataset_05'
+    dataset_name = 'dataset_07'
     colors = ['red','blue','green'] 
     n_circles = [4,3,3]
 
 
-    for n in range(4):
+    for n in range(20):
         file_name = 'record_' + "{0:0=2d}".format(n)
 
         # Record

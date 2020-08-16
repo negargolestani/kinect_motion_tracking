@@ -1,7 +1,5 @@
 from utils import*
 
-import scipy.io as sio
-
 
 ####################################################################################################################################################
 class NODE(object):
@@ -212,9 +210,9 @@ class SYSTEM(object):
 ####################################################################################################################################################
 if __name__ == '__main__':
 
-    dataset_name = 'dataset_05'    
+    dataset_name = 'dataset_01'    
     doPlot = False
-    doSave = False
+    doSave = True
 
     sys_info = get_sys_info(dataset_name)    
     sys = SYSTEM(system_info=sys_info)

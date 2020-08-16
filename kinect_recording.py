@@ -97,9 +97,9 @@ class KINECT(object):
 ####################################################################################################################################################
 if __name__ == '__main__':
     
-    dataset_name ='dataset_05'
-    file_name = 'record_04'
-    record_time = 60
+    dataset_name ='dataset_07'
+    file_name = 'record_19'
+    record_time = 40
 
 
     # Initialization
