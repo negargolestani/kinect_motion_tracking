@@ -12,6 +12,7 @@ import json
 import time as time_lib
 import csv
 import glob
+import random
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from pathlib import Path
@@ -20,11 +21,15 @@ from scipy import signal, interpolate, stats
 from collections import defaultdict
 from math import*
 import pywt
+from itertools import chain
+
+
 
 
 main_directory = str( Path(__file__).parents[1] )
 datime_format = '%H:%M:%S.%f'
 dataset_folder_name = 'dataset'
+synth_dataset_folder_name = 'synthetic_dataset'
 
 ####################################################################################################################################################
 def get_time_file_path(dataset_name, file_name):
@@ -59,7 +64,9 @@ def get_sys_info(dataset_name):
     sys_info = pd.read_csv(file_path, delimiter='\t')
     return sys_info
 ####################################################################################################################################################
-
+def get_synth_dataset_folder_path(dataset_name):
+    return main_directory + '/' + synth_dataset_folder_name + '/' + dataset_name 
+####################################################################################################################################################
 
 
 ####################################################################################################################################################
@@ -69,7 +76,6 @@ def create_folder(file_path):
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
 ####################################################################################################################################################
-
 
 
 
