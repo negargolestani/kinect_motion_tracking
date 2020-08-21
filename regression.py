@@ -3,10 +3,15 @@ from utils import*
 
 import tensorflow as tf
 from keras.models import Sequential, Model
-from keras.layers import Input, Dense, Lambda, Layer, Add, Multiply
-from sklearn.metrics import mean_squared_error
+from keras.layers import Input, Dense, Lambda, Layer, Add, Multiply, LSTM, SimpleRNN, Dropout
+from sklearn.metrics import*
 from keras import backend as K
 from pycaret.regression import*
+
+import tcn
+import keras
+from keras.optimizers import*
+from IPython.display import display, clear_output
 
 eps = 1e-12
 checkpoints_folderName = 'Checkpoints'
@@ -97,10 +102,9 @@ def generate_synth_motion_dataset(train_dataset_name, N=1000, save_dataset_name=
 ####################################################################################################################################################
 class REGRESSOR(object):
     ################################################################################################################################################
-    def __init__(self, win_size, Nfeatures, step=1, **params ):
+    def __init__(self, win_size, step=1, **params ):
         np.random.seed(7)        
         self.win_size = win_size
-        self.Nfeatures = Nfeatures
         self.step = step                
         self.build_model(**params)
     ################################################################################################################################################
@@ -140,7 +144,7 @@ class REGRESSOR(object):
 class RNN(REGRESSOR):
     def build_model(self, Nunits=3, activation='linear'):        
         self.model = Sequential()           
-        self.model.add( LSTM(units=Nunits, activation=activation, return_sequences=True, input_shape=(self.win_size, self.Nfeatures)) )        
+        self.model.add( LSTM(units=Nunits, activation=activation, return_sequences=True, input_shape=(self.win_size, )) )        
         self.model.add( LSTM(units=Nunits, activation=activation, return_sequences=True) )        
         self.model.add( LSTM(units=Nunits, activation=activation))   
         # self.model.add(Dropout(0.1))
@@ -151,8 +155,8 @@ class RNN(REGRESSOR):
         return 
 ####################################################################################################################################################
 class TCN(REGRESSOR):
-    def build_model(self, Nlayers=2, nb_filters=5, Nfeatures=2, activation=None, optimizer='adam', loss='mse' ):  
-        i = tf.keras.Input(batch_shape=(None, self.win_size, Nfeatures)) 
+    def build_model(self, Nlayers=2, nb_filters=5, activation=None, optimizer='adam', loss='mse' ):  
+        i = tf.keras.Input(batch_shape=(None, self.win_size)) 
         if Nlayers>1:
             o = tcn.TCN(nb_filters=nb_filters, return_sequences=True)(i)
             for n in range(Nlayers-2): tcn.TCN(nb_filters=nb_filters, return_sequences=True)(o)    
@@ -177,11 +181,11 @@ class DATA(object):
         self.Y = np.array(Y)
         return
     ######################################################################################################        
-    def segment(self, win_size, stride=None, as_df=False):
+    def segment(self, win_size, step=None, as_df=False):
         X_segmented, Y_segmented = list(), list()
-        if stride is None: stride = win_size
+        if step is None: step = win_size
         
-        for t in range(0, self.X.shape[1] - win_size, stride): 
+        for t in range(0, self.X.shape[1] - win_size, step): 
             X_segmented = [*X_segmented, *self.X[:,t:t+win_size]]
             Y_segmented = [*Y_segmented, *self.Y[:,t+win_size]]   
 
