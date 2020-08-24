@@ -22,8 +22,20 @@ from collections import defaultdict
 from math import*
 import pywt
 from itertools import chain
+from numpy.fft import fft, ifft, fft2, ifft2, fftshift
 
+import tensorflow as tf
+from keras.models import Sequential, Model
+from keras.layers import Input, Dense, Lambda, Layer, Add, Multiply, LSTM, SimpleRNN, Dropout
+from sklearn.metrics import*
+from keras import backend as K
+from pycaret.regression import*
+from sklearn.linear_model import LinearRegression
 
+import tcn
+import keras
+from keras.optimizers import*
+from IPython.display import display, clear_output
 
 
 main_directory = str( Path(__file__).parents[1] )
@@ -50,12 +62,6 @@ def get_rfid_file_path(dataset_name, file_name):
 def get_arduino_file_path(dataset_name, file_name):
     return main_directory + '/' + dataset_folder_name + '/' + dataset_name + '/arduino/' + file_name + '.csv'
 ####################################################################################################################################################
-def get_dataset_file_path(dataset_name, file_name):
-    return main_directory + '/' + dataset_folder_name + '/' + dataset_name + '/data/' + file_name + '.pkl'
-####################################################################################################################################################
-def get_result_file_path(file_name):
-    return main_directory + '/results/' + file_name     
-####################################################################################################################################################
 def get_color_setting_file_path(dataset_name, file_name):
     return main_directory + '/' + dataset_folder_name +  '/' + dataset_name  + '/calibration_setting/' + file_name + '.pickle'
 ####################################################################################################################################################
@@ -64,8 +70,8 @@ def get_sys_info(dataset_name):
     sys_info = pd.read_csv(file_path, delimiter='\t')
     return sys_info
 ####################################################################################################################################################
-def get_synth_dataset_folder_path(dataset_name):
-    return main_directory + '/' + synth_dataset_folder_name + '/' + dataset_name 
+def get_dataset_folder_path(dataset_name):
+    return main_directory + '/' + dataset_folder_name + '/' + dataset_name + '/data' 
 ####################################################################################################################################################
 
 

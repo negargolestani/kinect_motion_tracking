@@ -1,54 +1,14 @@
 
 from utils import*
 
-import tensorflow as tf
-from keras.models import Sequential, Model
-from keras.layers import Input, Dense, Lambda, Layer, Add, Multiply, LSTM, SimpleRNN, Dropout
-from sklearn.metrics import*
-from keras import backend as K
-from pycaret.regression import*
-
-import tcn
-import keras
-from keras.optimizers import*
-from IPython.display import display, clear_output
-
 eps = 1e-12
-checkpoints_folderName = 'Checkpoints'
-checkpoints_modelName = 'model.ckpt'
-
-# from sklearn import*
-# from sklearn.svm import SVR
-# from sklearn.pipeline import make_pipeline
-# from sklearn.preprocessing import StandardScaler
-# from sklearn.ensemble import GradientBoostingRegressor
-# from sklearn.metrics import mean_squared_error
-
-
 
 ####################################################################################################################################################
-def get_measured_dataset(dataset_name, resample_dt=.1, as_dict=False):
-    sys_info = get_sys_info(dataset_name)    
-    sys = SYSTEM(system_info=sys_info)
-
-    dataset = list()
-    for file_name in glob.glob(get_time_file_path(dataset_name, '')[:-4]+'*.csv'):    
-        file_name = file_name.replace("\\","/").split('/')[-1][:-4]
-        reader_data = sys.reader.get_data(dataset_name, file_name)  
-        for i, tag in enumerate(sys.tags):
-            tag_data = tag.get_data(dataset_name, file_name, ref_node_data=reader_data, resample_dt=resample_dt)
-            tag_data.time -= tag_data.time.iloc[0]
-            dataset.append(tag_data)   
-
-    if as_dict:
-        data_dict = dict()
-        for column in dataset[0].columns: data_dict.update({ column : np.array([ data[column].values for data in dataset]) })
-        return data_dict
-    
-    return dataset
+def load_dataset(dataset_name, resample_dt=None, as_dict=True):
+    return globals()['load_dataset_'+dataset_name.split('_')[0]](dataset_name, resample_dt=resample_dt, as_dict=as_dict)
 ####################################################################################################################################################
-def get_synth_dataset(dataset_name, as_dict=False):
-    synth_dataset_folder_path = get_synth_dataset_folder_path(dataset_name)
+def load_dataset_synth(dataset_name, resample_dt=None, as_dict=True):
+    synth_dataset_folder_path = get_dataset_folder_path(dataset_name)
 
     dataset_dict = dict()
     for file_path in glob.glob(synth_dataset_folder_path + '/*.csv'):
@@ -65,136 +25,66 @@ def get_synth_dataset(dataset_name, as_dict=False):
         dataset.append(data_df)    
     return dataset
 ####################################################################################################################################################
-def generate_synth_motion_dataset(train_dataset_name, N=1000, save_dataset_name=None, resample_dt=.1):
-    
-    train_dataset_list_df = get_measured_dataset(train_dataset_name, resample_dt=resample_dt)
-    Nt = min( [len(data) for data in train_dataset_list_df])        
-    synthesizer = SYNTHESIZER( Nt )
+def load_dataset_arduino(dataset_name, resample_dt=None, as_dict=True):
+    dataset = list()
+    for file_path in glob.glob(get_dataset_folder_path(dataset_name) +'/*.csv'):        
+        data = pd.read_csv(file_path)
 
-    time = np.array([ data.time.values[:Nt] for data in train_dataset_list_df])
-    distance = np.array([ data.distance.values[:Nt] for data in train_dataset_list_df])
-    lat_misalignment = np.array([ data.lat_misalignment.values[:Nt] for data in train_dataset_list_df])
-    ang_misalignment = np.array([ data.ang_misalignment.values[:Nt] for data in train_dataset_list_df])
-    height = np.sqrt( np.subtract(distance**2, lat_misalignment**2))
+        if resample_dt is not None:
+            resampled_data = pd.DataFrame({'time':np.arange(data.time.iloc[0], data.time.iloc[-1], resample_dt)})
+            for column in data.columns:
+                if column =='time':continue
+                resampler = interpolate.interp1d(data.time.values, data[column].values, kind='linear')
+                resampled_data[column] = np.nan_to_num( resampler(resampled_data.time.values) )
+                # resampled_data[column] = signal.savgol_filter( resampled_data[column], window_length=window_length, polyorder=1, axis=0)             
+            data = resampled_data        
+        dataset.append(data)
 
-    height_synth = synthesizer.generate(N, train_data=height)
-    lat_misalignment_synth = synthesizer.generate(N, train_data=lat_misalignment)
-    ang_misalignment_synth = synthesizer.generate(N, train_data=ang_misalignment)
-    distance_synth = np.sqrt( np.add(height_synth**2, lat_misalignment_synth**2))
+    if as_dict:
+        dataset_dict = dict()
+        for column in dataset[0].columns: dataset_dict.update({ column : np.array([ data[column].values for data in dataset]) })
+        return dataset_dict
 
-    synth_data = dict(
-        time = time,        
-        distance = distance_synth,
-        lat_misalignment = lat_misalignment_synth,
-        ang_misalignment = ang_misalignment_synth)
-    
-    # Save
-    if save_dataset_name is not None:
-        folder_path = '../synthetic_dataset/' + save_dataset_name + '/'
-        create_folder(folder_path + '.csv')
-        for key,value in synth_data.items(): np.savetxt(folder_path+'/'+key +'.csv', value) 
-        
-    return synth_data
+    return dataset
 ####################################################################################################################################################
 
-
-
 ####################################################################################################################################################
-class REGRESSOR(object):
-    ################################################################################################################################################
-    def __init__(self, win_size, step=1, **params ):
-        np.random.seed(7)        
-        self.win_size = win_size
-        self.step = step                
-        self.build_model(**params)
-    ################################################################################################################################################
-    def train(self, train_data, epochs=30, verbose=0, show=True):        
-        loss = list()        
-        for n_epoch in range(epochs):
-            display(n_epoch)
-            
-            ep_loss = list()            
-            for i in range(0, np.shape(train_data.X)[1]-self.win_size, self.step):
-                history = self.model.fit( 
-                    train_data.X[:, i:i+self.win_size,:], 
-                    train_data.Y[:, i+self.win_size-1], 
-                    epochs = 1, 
-                    verbose = verbose
-                )    
-                ep_loss.append(history.history['loss'])
-            
-            loss.append(ep_loss)
-            clear_output(wait=True)
-            
-            if show:
-                plt.plot( np.ndarray.flatten( np.array(loss)) )
-                plt.show()
-                
-        return np.array(loss)
-    ################################################################################################################################################    
-    def predict(self, X):
-        predictions = list()
-        for i in range(0, np.shape(X)[1]-self.win_size, self.step):
-            pred = self.model.predict( X[:, i:i+self.win_size,:])
-            predictions.append(pred)
-        
-        predictions = np.array(predictions)
-        return predictions.reshape((-1, np.shape(predictions)[1])).transpose()  
-####################################################################################################################################################
-class RNN(REGRESSOR):
-    def build_model(self, Nunits=3, activation='linear'):        
-        self.model = Sequential()           
-        self.model.add( LSTM(units=Nunits, activation=activation, return_sequences=True, input_shape=(self.win_size, )) )        
-        self.model.add( LSTM(units=Nunits, activation=activation, return_sequences=True) )        
-        self.model.add( LSTM(units=Nunits, activation=activation))   
-        # self.model.add(Dropout(0.1))
-        self.model.add( Dense(1))          
-            
-        self.model.compile(loss='mse', optimizer='adam')         
-        print(self.model.summary())        
-        return 
-####################################################################################################################################################
-class TCN(REGRESSOR):
-    def build_model(self, Nlayers=2, nb_filters=5, activation=None, optimizer='adam', loss='mse' ):  
-        i = tf.keras.Input(batch_shape=(None, self.win_size)) 
-        if Nlayers>1:
-            o = tcn.TCN(nb_filters=nb_filters, return_sequences=True)(i)
-            for n in range(Nlayers-2): tcn.TCN(nb_filters=nb_filters, return_sequences=True)(o)    
-            o = tcn.TCN(nb_filters=nb_filters, return_sequences=False)(o)
-        else:
-            o = tcn.TCN(nb_filters=nb_filters, return_sequences=False)(i)     
-            
-        o = tf.keras.layers.Dense(1, activation=activation)(o)
-        self.model = tf.keras.Model(inputs=[i], outputs=[o])
-        
-        self.model.compile(loss='mse', optimizer='adam')        
-        print(self.model.summary())                
-        return 
+def get_delay(x, y):
+    # delay < 0 means that y starts 'delay' time steps before x 
+    # delay > 0 means that y starts 'delay' time steps after x
+    assert len(x) == len(y)
+    c = fftshift( np.real(ifft(fft(x) * fft(np.flipud(y)))) )   # cross correlation using fft
+    assert len(c) == len(x)
+    zero_index = int(len(x) / 2) - 1
+    delay = zero_index - np.argmax(c)
+    return delay
 ####################################################################################################################################################
 
 
 ####################################################################################################################################################
 class DATA(object):    
     ######################################################################################################
-    def __init__(self, X, Y):            
-        self.X = np.array(X) 
-        self.Y = np.array(Y)
+    def __init__(self, X=[], Y=[]):            
+        # self.X = np.array(X)  
+        self.X = np.array(X) / (1+eps)  # Don't know why !!!  have to divide to handle pycaret error in training 
+        self.Y = np.array(Y)        
         return
     ######################################################################################################        
     def segment(self, win_size, step=None, as_df=False):
-        X_segmented, Y_segmented = list(), list()
-        if step is None: step = win_size
+        if step is None: step = win_size        
         
+        X, Y = list(), list()
         for t in range(0, self.X.shape[1] - win_size, step): 
-            X_segmented = [*X_segmented, *self.X[:,t:t+win_size]]
-            Y_segmented = [*Y_segmented, *self.Y[:,t+win_size]]   
-
+            X = [*X, *self.X[:,t:t+win_size]]
+            Y = [*Y, *self.Y[:,t+win_size]]           
+        data_segmented = DATA(X, Y)
+       
         if as_df:
-            data_df = pd.DataFrame( np.concatenate([X_segmented, np.reshape(Y_segmented,(-1,1))], axis=1) )
+            data_df = pd.DataFrame( np.concatenate([data_segmented.X, np.reshape(data_segmented.Y,(-1,1))], axis=1) )
             data_df.columns = [*['feature_'+str(i) for i in range(win_size)], 'target']
             return data_df
 
-        return DATA(X_segmented, Y_segmented)                
+        return data_segmented            
     ######################################################################################################
     def merge(self, new_dataset):
         merged_dataset = copy.deepcopy(self)
@@ -227,20 +117,20 @@ class DATA(object):
 
         Nt_list = [np.shape(x)[0] for x in self.X]
         Nt = int( eval('np.' + Nt_mtx)(Nt_list) )
-        Nd, Nf = len(self.X),  np.shape(self.X[0])[1]
+        Nd = len(self.X)
         
-        data_mtx.X = np.zeros( (Nd,Nt,Nf) )
+        data_mtx.X = np.zeros( (Nd,Nt) )
         data_mtx.Y = np.zeros( (Nd,Nt) )
         
         for idx, x in enumerate(self.X): 
             nt = np.shape(x)[0]
             
             if Nt >= nt:
-                data_mtx.X[idx,:,:] = np.pad( x, ((0,Nt-nt),(0,0)),'constant')
+                data_mtx.X[idx,:nt] = x
                 data_mtx.Y[idx,:nt] = self.Y[idx]
                 
             else:
-                data_mtx.X[idx,:,:] = x[:Nt,:]
+                data_mtx.X[idx,:] = x[:Nt]
                 data_mtx.Y[idx, :] = self.Y[idx][:Nt]
         return data_mtx
     ######################################################################################################
@@ -324,315 +214,85 @@ class DATA(object):
         normalized_data = copy.deepcopy(self)
         STD = 1
         for idx, x in enumerate(normalized_data.X): 
-            MEAN = np.mean(x,axis=0)
-            if scale: STD = np.std(x,axis=0) + eps
+            MEAN = np.nanmean(x,axis=0)
+            if scale: STD = np.nanstd(x,axis=0) + eps
             normalized_data.X[idx] = np.subtract(x,MEAN) / STD    
         return normalized_data         
 ####################################################################################################################################################
 
+
 ####################################################################################################################################################
-class NODE(object):
+class REGRESSOR(object):
     ################################################################################################################################################
-    def __init__(self, markers_color, IDD=None, port=None):
-        self.markers_color = markers_color
-        self.IDD = IDD
-        self.port = port
+    def __init__(self, win_size, step=1, **params ):
+        np.random.seed(7)        
+        self.win_size = win_size
+        self.step = step                
+        self.build_model(**params)
     ################################################################################################################################################
-    def get_data(self, dataset_name, file_name, ref_node_data=None, window_length=11, resample_dt=None):        
-        
-        data = self.get_motion(dataset_name, file_name, window_length=window_length, ref_node_data=ref_node_data)  
-        time = data.time    # use kinect time as ref time
-
-        if self.IDD is not None: 
-            rssi = self.get_rssi(dataset_name, file_name, window_length=window_length)
-            data = data.merge( rssi, on='time', how='outer', suffixes=('', ''), sort=True)            
-            # t_start, t_end = max(t_start, rssi.time.iloc[0]), min(t_end,  rssi.time.iloc[-1])
-            time = time.loc[time> rssi.time.iloc[0]].loc[time< rssi.time.iloc[-1]]
-
-        if self.port is not None: 
-            vind = self.get_vind(dataset_name, file_name, window_length=window_length)
-            data = data.merge( vind, on='time', how='outer', suffixes=('', ''), sort=True)
-            # t_start, t_end = max(t_start, vind.time.iloc[0]), min(t_end,  vind.time.iloc[-1])
-            time = time.loc[time> vind.time.iloc[0]].loc[time< vind.time.iloc[-1]]
-        
-        data.interpolate(method='nearest', axis=0, inplace=True)      
-        data = pd.merge( pd.DataFrame(time), data, on='time', how='inner', suffixes=('', ''), sort=True)
-
-
-        data.dropna(inplace=True)
-        data.reset_index(drop=True, inplace=True)
-
-        if resample_dt is not None:
-            resampled_data = pd.DataFrame({'time':np.arange(data.time.iloc[0], data.time.iloc[-1], resample_dt)})
-            for column in data.columns:
-                if column =='time':continue
-                resampler = interpolate.interp1d(data.time.values, data[column].values, kind='linear')
-                resampled_data[column] = np.nan_to_num( resampler(resampled_data.time.values) )
-                # resampled_data[column] = signal.savgol_filter( resampled_data[column], window_length=window_length, polyorder=1, axis=0)     
-            data = resampled_data
-
-        return data
-    ################################################################################################################################################
-    def get_motion(self, dataset_name, file_name, window_length=11, ref_node_data=None):   
-        markers_file_path = get_markers_file_path(dataset_name, file_name)  
-        raw_df  = pd.read_csv(
-            markers_file_path,                                                  # relative python path to subdirectory
-            usecols = ['time', self.markers_color],                             # Only load the three columns specified.
-            parse_dates = ['time'] )         
-
-        # Time
-        date_time = pd.to_datetime( raw_df['time'] , format=datime_format)
-        time = [ np.round( (datetime.combine(date.min, t.time())-datetime.min).total_seconds(), 2) for t in date_time]
-        
-        # Markers
-        markers = [list(map(float, l.replace(']','').replace('[','').replace('\n','').split(", "))) for l in raw_df[self.markers_color].values]  
-        markers_npy = np.array(markers).reshape(len(time), -1, 3)
-        # DON'T Smooth markers. markers can be switched in array and smoothing causes error    
-
-        # Center    
-        center = np.mean(markers_npy, axis=1)         
-        center = np.nan_to_num(center)
-        center = signal.savgol_filter( center, window_length=window_length, polyorder=1, axis=0)     
-
-        # Norm
-        norm = np.cross( markers_npy[:,1,:] - markers_npy[:,0,:], markers_npy[:,2,:] - markers_npy[:,0,:])
-        # norm[ norm[:,2]<0, :] *= -1   # Don't use ! 
-        norm = norm / ( np.reshape(np.linalg.norm(norm, axis=1), (-1,1)) * np.ones((1,3)))
-        # DOn't smooth norm 
-        
-        if ref_node_data is None:            
-            return pd.DataFrame({
-                'time': time,
-                'markers': markers,
-                'center': list(center), 
-                'norm': list(norm)
-                })    
-
-        ############################
-        #### Relative Movements ####
+    def train(self, train_data, epochs=30, verbose=0, show=True):        
+        loss = list()        
+        for n_epoch in range(epochs):
+            display(n_epoch)
             
-        N = 10
-        ref_center = np.mean(ref_node_data.center.loc[:N], axis=0)
-        ref_norm = np.mean(ref_node_data.norm.loc[:N], axis=0)           
-                
-        distance, lat_misalignment, ang_misalignment = list(), list(), list()
-        for i in range(len(center)):
-            coilsDistance, xRotAngle = calculate_params(ref_center, ref_norm, center[i,:], norm[i,:])
-            distance.append(np.linalg.norm(coilsDistance))
-            lat_misalignment.append(np.linalg.norm(coilsDistance[:2]))
-            ang_misalignment.append(xRotAngle)
-
-        # # Smoothing (smooth these params after all calculation)               
-        distance = signal.savgol_filter( distance, window_length=window_length, polyorder=1, axis=0)                        
-        lat_misalignment = signal.savgol_filter( lat_misalignment, window_length=window_length, polyorder=1, axis=0)        
-        ang_misalignment = signal.savgol_filter( ang_misalignment, window_length=window_length, polyorder=1, axis=0)  
-       
-        return pd.DataFrame({
-            'time': time,
-            'distance': list(distance),
-            'lat_misalignment': list(lat_misalignment),
-            'ang_misalignment': list(ang_misalignment)
-            })                      
-    ################################################################################################################################################
-    def get_rssi(self, dataset_name, file_name, window_length=11):
-        # Load data 
-        rfid_file_path = get_rfid_file_path(dataset_name, file_name)       
-        raw_df = pd.read_csv(
-            rfid_file_path,                                                     # relative python path to subdirectory
-            delimiter  = ';',                                                   # Tab-separated value file.
-            usecols = ['IDD', 'Time', 'Ant/RSSI'],                              # Only load the three columns specified.
-            parse_dates = ['Time'] )                                            # Intepret the birth_date column as a date      
-        raw_df = raw_df.loc[ raw_df['IDD'] == self.IDD, :]
-
-        # Time
-        date_time = pd.to_datetime( raw_df['Time'] , format=datime_format)
-        time = [ np.round( (datetime.combine(date.min, t.time())-datetime.min).total_seconds(), 2) for t in date_time]
-        
-        # RSSI
-        # rssi_df = pd.DataFrame({ 'rssi': raw_df['Ant/RSSI'].str.replace('Ant.No 1 - RSSI: ', '').astype(int) })
-        rssi_df = raw_df['Ant/RSSI'].str.replace('Ant.No 1 - RSSI: ', '').astype(float) 
-        rssi_df = rssi_df.rolling(window_length, axis=0).median()   # Smoothing
-        rssi_df = rssi_df.ffill(axis=0).bfill(axis=0)               # Gap Filling
-
-        return pd.DataFrame({
-            'time':time,
-            'rssi':rssi_df.tolist() 
-            })
-    ################################################################################################################################################
-    def get_vind(self, dataset_name, file_name, window_length=11):
-        # Load data 
-        arduino_file_path = get_arduino_file_path(dataset_name, file_name)               
-        raw_df = pd.read_csv(arduino_file_path)
-        raw_df = raw_df.loc[ raw_df['port'] == self.port, :]
-
-        # Time
-        date_time = pd.to_datetime( raw_df['time'] , format=datime_format)
-        time = [ np.round( (datetime.combine(date.min, t.time())-datetime.min).total_seconds(), 2) for t in date_time]
-        
-        # RSSI
-        # rssi_df = pd.DataFrame({ 'rssi': raw_df['Ant/RSSI'].str.replace('Ant.No 1 - RSSI: ', '').astype(int) })
-        vind_df = raw_df['vind'].astype(float) 
-        vind_df = vind_df.rolling(window_length, axis=0).median()   # Smoothing
-        vind_df = vind_df.ffill(axis=0).bfill(axis=0)               # Gap Filling
-
-        return pd.DataFrame({
-            'time':time,
-            'vind':vind_df.tolist() 
-            })
-####################################################################################################################################################
-class SYSTEM(object):
-    ################################################################################################################################################
-    def __init__(self, system_info = None):
-        self.reader = None
-        self.tags = list()
-
-        if system_info is not None:
+            ep_loss = list()            
+            for i in range(0, np.shape(train_data.X)[1]-self.win_size, self.step):
+                history = self.model.fit( 
+                    train_data.X[:, i:i+self.win_size,:], 
+                    train_data.Y[:, i+self.win_size-1], 
+                    epochs = 1, 
+                    verbose = verbose
+                )    
+                ep_loss.append(history.history['loss'])
             
-            for idx in system_info.index:                
-                node_info = system_info.loc[idx, system_info.columns!='type'].to_dict()                
-                for key,value in node_info.items():
-                    if value == 'None': node_info.update({key: None})
+            loss.append(ep_loss)
+            clear_output(wait=True)
+            
+            if show:
+                plt.plot( np.ndarray.flatten( np.array(loss)) )
+                plt.show()
                 
-                node = NODE( **node_info )
-                if system_info.loc[idx, 'type'] == 'tag': self.tags.append(node)
-                else: self.reader = node
-        return
-    ################################################################################################################################################
-    def add_reader(self, reader_markers_color):
-        self.reader = NODE( reader_markers_color )
-        return
-    ################################################################################################################################################
-    def add_tag(self, markers_color, IDD=None, port=None):
-        self.tags.append( NODE(markers_color, IDD=IDD, port=port) )   
-        return               
-    ################################################################################################################################################
-    def get_data_old(self, dataset_name, file_name, save=False, window_length=11, resample_dt=None):
-        reader_data = self.reader.get_data(dataset_name, file_name)  
-        data = pd.DataFrame({'time':reader_data.time})
-
-        for i, tag in enumerate(self.tags):
-            tag_data = tag.get_data(dataset_name, file_name, ref_node_data=reader_data)
-            tag_data = tag_data.add_suffix('_'+str(i)).rename({'time_'+str(i):'time'}, axis='columns')
-            data = data.merge( tag_data, on='time', how='outer', suffixes=('', '' ), sort=True )
-
-        data.interpolate(method='nearest', inplace=True)  
-        data.dropna(inplace=True)
-        data.reset_index(drop=True, inplace=True)
-        data.time -= data.time.iloc[0]
-
-        if resample_dt is not None:
-            resampled_data = pd.DataFrame({'time':np.arange(data.time.iloc[0], data.time.iloc[-1], resample_dt)})
-            for column in data.columns:
-                if column =='time':continue
-                resampler = interpolate.interp1d(data.time.values, data[column].values, kind='linear')
-                resampled_data[column] = np.nan_to_num( resampler(resampled_data.time.values) )
-                # resampled_data[column] = signal.savgol_filter( resampled_data[column], window_length=window_length, polyorder=1, axis=0)     
-            data = resampled_data
-        # Save
-        if save:
-            dataset_file_path = get_dataset_file_path(dataset_name, file_name)
-            create_folder(dataset_file_path)
-            data.to_pickle( dataset_file_path)  
-            print(file_name, 'is saved.')
-
-        return data
-####################################################################################################################################################
-class KLDivergenceLayer(Layer):
-    def __init__(self, *args, **kwargs):
-        self.is_placeholder = True
-        super(KLDivergenceLayer, self).__init__(*args, **kwargs)
-    ################################################################################################################################################
-    def call(self, inputs):
-        mu, log_var = inputs
-        kl_batch = - .5 * K.sum(1 + log_var - K.square(mu) -  K.exp(log_var), axis=-1)
-        self.add_loss(K.mean(kl_batch), inputs=inputs)
-        return inputs
-####################################################################################################################################################
-class SYNTHESIZER(object):
-    ################################################################################################################################################
-    def __init__(self, Nt, hiddendim=300, latentdim=100):
-        self.hiddendim = hiddendim
-        self.latentdim = latentdim
-        self.Nt = Nt
-        return
-    ################################################################################################################################################
-    def build(self):
-        epsilon_std = 1.0
-
-        x = Input(shape=(self.Nt,))
-        h = Dense(self.hiddendim, activation='relu')(x)
-        z_mu = Dense(self.latentdim)(h)
-        z_log_var = Dense(self.latentdim)(h)
-        z_mu, z_log_var = KLDivergenceLayer()([z_mu, z_log_var])
-        z_sigma = Lambda(lambda t: K.exp(.5*t))(z_log_var)
-        eps = Input(tensor=K.random_normal(stddev=epsilon_std, shape=(K.shape(x)[0], self.latentdim)))
-        z_eps = Multiply()([z_sigma, eps])
-        z = Add()([z_mu, z_eps])
-
-        self.encoder = Model(x, z_mu)        
-        self.decoder = Sequential([
-            Dense(self.hiddendim, input_dim=self.latentdim, activation='relu'),
-            Dense(self.Nt, activation='sigmoid') ])
-        x_pred = self.decoder(z)
-
-        self.vae = Model(inputs=[x, eps], outputs=x_pred)
-
-        def nll(y_true, y_pred): return K.sum(K.binary_crossentropy(y_true, y_pred), axis=-1)
-        self.vae.compile(optimizer='rmsprop', loss=nll)
+        return np.array(loss)
+    ################################################################################################################################################    
+    def predict(self, X):
+        predictions = list()
+        for i in range(0, np.shape(X)[1]-self.win_size, self.step):
+            pred = self.model.predict( X[:, i:i+self.win_size,:])
+            predictions.append(pred)
         
-        return
-    ################################################################################################################################################
-    def train(self, train_data, epochs=500):
-        self.build()
-        self.scale = np.max(train_data)
-        train_data_normalized = (train_data - np.min(train_data)) / (np.max(train_data) - np.min(train_data))
-        self.vae.fit(train_data_normalized, train_data_normalized, epochs=epochs, validation_data=(train_data_normalized, train_data_normalized), verbose=0)
-        return    
-    ################################################################################################################################################
-    def generate(self, N, train_data=None, window_length=11):
-        if train_data is not None: self.train(train_data)
-
-        synth_data = self.decoder.predict(np.random.multivariate_normal( [0]*self.latentdim, np.eye(self.latentdim), N))
-        synth_data = signal.savgol_filter( synth_data, window_length=window_length, polyorder=1, axis=1)     
-
-        # synth_data = (synth_data - np.mean(synth_data)) / (np.std(synth_data))
-        # synth_data = (synth_data - np.min(synth_data)) / (np.max(synth_data) - np.min(synth_data))
-        synth_data = synth_data * self.scale 
-        return synth_data
+        predictions = np.array(predictions)
+        return predictions.reshape((-1, np.shape(predictions)[1])).transpose()  
 ####################################################################################################################################################
+class RNN(REGRESSOR):
+    def build_model(self, Nunits=3, activation='linear'):        
+        self.model = Sequential()           
+        self.model.add( LSTM(units=Nunits, activation=activation, return_sequences=True, input_shape=(self.win_size, )) )        
+        self.model.add( LSTM(units=Nunits, activation=activation, return_sequences=True) )        
+        self.model.add( LSTM(units=Nunits, activation=activation))   
+        # self.model.add(Dropout(0.1))
+        self.model.add( Dense(1))          
+            
+        self.model.compile(loss='mse', optimizer='adam')         
+        print(self.model.summary())        
+        return 
 ####################################################################################################################################################
-def calculate_params(loc_1_, align_1_, loc_2_, align_2_):
-    loc_1, loc_2, align_1, align_2 = np.array(loc_1_), np.array(loc_2_), np.array(align_1_), np.array(align_2_)
-    
-    if align_1[1] == 0: thetaX = 0
-    else: thetaX = atan( align_1[1]/align_1[2] )    
-
-    thetaY = atan( -align_1[0] / sqrt(align_1[1]**2 + align_1[2]**2) )
-    align_2_new = np.matmul(get_rotationMatrix(thetaX, thetaY, 0), np.reshape(align_2,[3,1]))    
+class TCN(REGRESSOR):
+    def build_model(self, Nlayers=2, nb_filters=5, activation=None, optimizer='adam', loss='mse' ):  
+        i = tf.keras.Input(batch_shape=(None, self.win_size)) 
+        if Nlayers>1:
+            o = tcn.TCN(nb_filters=nb_filters, return_sequences=True)(i)
+            for n in range(Nlayers-2): tcn.TCN(nb_filters=nb_filters, return_sequences=True)(o)    
+            o = tcn.TCN(nb_filters=nb_filters, return_sequences=False)(o)
+        else:
+            o = tcn.TCN(nb_filters=nb_filters, return_sequences=False)(i)     
+            
+        o = tf.keras.layers.Dense(1, activation=activation)(o)
+        self.model = tf.keras.Model(inputs=[i], outputs=[o])
         
-    if align_2_new[0] == 0: thetaZ = 0
-    else: thetaZ = atan(align_2_new[0]/align_2_new[1])    
-    Rtot = get_rotationMatrix(thetaX, thetaY , thetaZ)
-    loc_2_new = np.matmul(Rtot, np.reshape(loc_2-loc_1, [3,1]))    
-    align_2_new = np.matmul(Rtot, np.reshape(align_2, [3,1]))    
-
-    coilsDistance = abs(np.round(np.reshape(loc_2_new, [1,3])[0], 10))
-    xRotAngle = np.round( atan(abs( align_2_new[1]/align_2_new[2] )) * 180/pi )
-    # xRotAngle = np.round( atan(-align_2_new[1]/align_2_new[2]) * 180/pi )
-
-    return coilsDistance, xRotAngle
+        self.model.compile(loss='mse', optimizer='adam')        
+        print(self.model.summary())                
+        return 
 ####################################################################################################################################################
-def get_rotationMatrix(XrotAngle, YrotAngle, ZrotAngle):
-    Rx = np.array([ [1, 0,0], [0, cos(XrotAngle), -sin(XrotAngle)], [0, sin(XrotAngle), cos(XrotAngle)] ])
-    Ry = np.array([ [cos(YrotAngle), 0, sin(YrotAngle)], [0, 1, 0], [-sin(YrotAngle), 0, cos(YrotAngle)] ])
-    Rz = np.array([ [cos(ZrotAngle), -sin(ZrotAngle), 0], [sin(ZrotAngle), cos(ZrotAngle), 0], [0, 0, 1] ])
-    Rtotal =  np.matmul(np.matmul(Rz,Ry),Rx)
-    return Rtotal
-####################################################################################################################################################
-
-
-
-
 
 
 
