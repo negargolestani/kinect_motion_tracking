@@ -3,9 +3,13 @@ from utils import*
 
 
 ####################################################################################################################################################
-def generate_synth_motion_data(train_dataset_name, save_dataset_name=None, N=1000, resample_dt=.1):
-    sys = SYSTEM(train_dataset_name)
-    train_dataset_list_df = sys.get_data(resample_dt=resample_dt)
+def generate_synth_motion_data(train_dataset_name_list, save_dataset_name=None, N=1000, resample_dt=.1):
+    
+    train_dataset_list_df = list()
+    for train_dataset_name in train_dataset_name_list:
+        sys = SYSTEM(train_dataset_name)
+        train_dataset_list_df_n = sys.get_data(resample_dt=resample_dt)
+        train_dataset_list_df = [*train_dataset_list_df, *train_dataset_list_df_n]
     Nt = min( [len(data) for data in train_dataset_list_df])        
     synthesizer = SYNTHESIZER( Nt )
 
@@ -217,7 +221,7 @@ class SYSTEM(object):
     ################################################################################################################################################
     def get_data(self, file_name=None, save=False, resample_dt=None):
         if file_name is None: file_name_list = [file_path.replace("\\","/").split('/')[-1][:-4] for file_path in glob.glob(get_markers_file_path(self.dataset_name, '')[:-4]+'*.csv')]
-        else: file_name_list = [file_name]
+        else: file_name_list = [file_name ]
         
         dataset = list()
         for fn in file_name_list:
@@ -342,9 +346,28 @@ def get_rotationMatrix(XrotAngle, YrotAngle, ZrotAngle):
 if __name__ == '__main__':
     # Get data from raw measured data and Save as CSV file to load faster for regression    
     sys = SYSTEM('arduino_00')
-    data = sys.get_data(save=False, resample_dt=None)
-    print(data[0])
+    # data = sys.get_data(save=False, resample_dt=None)
+    # print(data[0])
 
-    # generate_synth_motion_data(train_dataset_name='arduino_01', save_dataset_name='synth_01')
+    # generate_synth_motion_data(train_dataset_name_list=['arduino_00','arduino_01','arduino_02'], save_dataset_name='synth_01', N=2000)
+
+    for n in range(9):
+        data = sys.get_data(file_name='record_1'+str(n), save=False, resample_dt=.1)
+        c1 = data[0]
+        c2 = data[1]
+
+        # feat = 'distance'
+        # ax = c1.plot(x='time', y=feat)
+        # c2.plot(x='time', y=feat, ax=ax)
+
+        d = abs(c1.distance - c2.distance)
+        ld = abs(c1.lat_misalignment-c2.lat_misalignment)
+
+        plt.plot(d)
+        plt.plot(ld)
+
+        plt.show()
+
+
 ################################################################################################################################################
         

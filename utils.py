@@ -30,12 +30,16 @@ from keras.layers import Input, Dense, Lambda, Layer, Add, Multiply, LSTM, Simpl
 from sklearn.metrics import*
 from keras import backend as K
 from pycaret.regression import*
-from sklearn.linear_model import LinearRegression
-
-import tcn
-import keras
-from keras.optimizers import*
 from IPython.display import display, clear_output
+
+import keras
+import tcn
+from sklearn.linear_model import LinearRegression
+from sklearn.neural_network import MLPRegressor
+from sklearn.datasets import make_regression
+from sklearn.model_selection import train_test_split
+from keras.optimizers import*
+
 
 
 main_directory = str( Path(__file__).parents[1] )

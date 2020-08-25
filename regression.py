@@ -5,7 +5,15 @@ eps = 1e-12
 
 ####################################################################################################################################################
 def load_dataset(dataset_name, resample_dt=None, as_dict=True):
-    return globals()['load_dataset_'+dataset_name.split('_')[0]](dataset_name, resample_dt=resample_dt, as_dict=as_dict)
+    dataset_type = dataset_name.split('_')[0]
+
+    if dataset_type == 'arduino' or dataset_type =='meas':
+        return load_dataset_meas(dataset_name, resample_dt=resample_dt, as_dict=as_dict)
+    
+    elif dataset_type == 'synth':
+        return load_dataset_synth(dataset_name, resample_dt=resample_dt, as_dict=as_dict)
+        
+    # return globals()['load_dataset_'+dataset_name.split('_')[0]](dataset_name, resample_dt=resample_dt, as_dict=as_dict)
 ####################################################################################################################################################
 def load_dataset_synth(dataset_name, resample_dt=None, as_dict=True):
     synth_dataset_folder_path = get_dataset_folder_path(dataset_name)
@@ -25,7 +33,7 @@ def load_dataset_synth(dataset_name, resample_dt=None, as_dict=True):
         dataset.append(data_df)    
     return dataset
 ####################################################################################################################################################
-def load_dataset_arduino(dataset_name, resample_dt=None, as_dict=True):
+def load_dataset_meas(dataset_name, resample_dt=None, as_dict=True):
     dataset = list()
     for file_path in glob.glob(get_dataset_folder_path(dataset_name) +'/*.csv'):        
         data = pd.read_csv(file_path)
