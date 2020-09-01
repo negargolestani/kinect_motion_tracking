@@ -21,7 +21,7 @@ from scipy import signal, interpolate, stats
 from collections import defaultdict
 from math import*
 import pywt
-from itertools import chain
+from itertools import chain, combinations
 from numpy.fft import fft, ifft, fft2, ifft2, fftshift
 
 import tensorflow as tf
@@ -71,7 +71,7 @@ def get_color_setting_file_path(dataset_name, file_name):
 ####################################################################################################################################################
 def get_sys_info(dataset_name):
     file_path = main_directory + '/' + dataset_folder_name +  '/' + dataset_name  + '/calibration_setting/sys_info.txt'
-    sys_info = pd.read_csv(file_path, delimiter='\t')
+    sys_info = pd.read_csv(file_path, delimiter='\t').replace({'None': None})
     return sys_info
 ####################################################################################################################################################
 def get_dataset_folder_path(dataset_name):

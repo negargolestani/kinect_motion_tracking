@@ -1,7 +1,6 @@
 
 from utils import*
 
-
 ####################################################################################################################################################
 def generate_synth_motion_data(train_dataset_name_list, save_dataset_name=None, N=1000, resample_dt=.1):
     
@@ -41,7 +40,65 @@ def generate_synth_motion_data(train_dataset_name_list, save_dataset_name=None, 
 
 
 
+
+
 ####################################################################################################################################################
+class SYSTEM(object):
+    ################################################################################################################################################
+    def __init__(self, dataset_name=None):
+        self.reader = None
+        self.tags = list()
+        self.dataset_name = None
+        
+        if dataset_name is not None:
+            self.dataset_name = dataset_name
+            system_info = get_sys_info(dataset_name)    
+            for idx in system_info.index:                
+                node_info = system_info.loc[idx, system_info.columns!='type'].to_dict()                
+                for key,value in node_info.items():
+                    if value == 'None': node_info.update({key: None})
+                
+                node = NODE( **node_info )
+                if system_info.loc[idx, 'type'] == 'tag': self.tags.append(node)
+                else: self.reader = node
+        return
+    ################################################################################################################################################
+    def add_reader(self, reader_markers_color):
+        self.reader = NODE( reader_markers_color )
+        return
+    ################################################################################################################################################
+    def add_tag(self, markers_color, IDD=None, port=None):
+        self.tags.append( NODE(markers_color, IDD=IDD, port=port) )   
+        return               
+    ################################################################################################################################################
+    def get_data(self, file_name=None, save=False, resample_dt=None, sampler_kind='linear'):
+        
+        if file_name is None: 
+            file_name_list = [file_path.replace("\\","/").split('/')[-1][:-4] for file_path in glob.glob(get_markers_file_path(self.dataset_name, '')[:-4]+'*.csv')]
+        else: 
+            file_name_list = [file_name ]
+        
+        dataset = list()
+        for fn in file_name_list:
+            start_time, tags_data = 0, list()            
+            reader_data = self.reader.get_data(self.dataset_name, fn)                      
+            for i, tag in enumerate(self.tags):
+                tag_data = tag.get_data(self.dataset_name, fn, ref_node_data=reader_data, resample_dt=resample_dt, sampler_kind=sampler_kind)
+                start_time = max(start_time, tag_data.time.iloc[0]) 
+                tags_data.append(tag_data)
+
+            for i, tag_data in enumerate(tags_data): 
+                tag_data = tag_data.loc[ tag_data.time >= start_time,: ] 
+                tag_data.time -= start_time
+                dataset.append(tag_data)
+                        
+                if save: 
+                    file_path = get_dataset_folder_path(self.dataset_name) + '/' + fn + '_' + self.tags[i].markers_color + '.csv'
+                    create_folder(file_path)
+                    tag_data.loc[:,['time','distance','lat_misalignment', 'ang_misalignment']].to_csv(file_path, index=None)            
+
+        return dataset
+########################################################################################################################################################
 class NODE(object):
     ################################################################################################################################################
     def __init__(self, markers_color, IDD=None, port=None):
@@ -49,7 +106,7 @@ class NODE(object):
         self.IDD = IDD
         self.port = port
     ################################################################################################################################################
-    def get_data(self, dataset_name, file_name, ref_node_data=None, window_length=11, resample_dt=None):        
+    def get_data(self, dataset_name, file_name, ref_node_data=None, window_length=11, resample_dt=None, sampler_kind='linear'):        
         
         data = self.get_motion(dataset_name, file_name, window_length=window_length, ref_node_data=ref_node_data)  
         time = data.time    # use kinect time as ref time
@@ -69,22 +126,33 @@ class NODE(object):
         data.interpolate(method='nearest', axis=0, inplace=True)      
         data = pd.merge( pd.DataFrame(time), data, on='time', how='inner', suffixes=('', ''), sort=True)
 
+        # data.dropna(inplace=True)
+        # data.reset_index(drop=True, inplace=True)
+        data.reset_index(inplace=True)
 
-        data.dropna(inplace=True)
-        data.reset_index(drop=True, inplace=True)
 
         if resample_dt is not None:
-            resampled_data = pd.DataFrame({'time':np.arange(data.time.iloc[0], data.time.iloc[-1], resample_dt)})
+            time_new = np.arange(data.time.iloc[0], data.time.iloc[-1], resample_dt)
+            resampled_data = pd.DataFrame({'time':time_new})
+
             for column in data.columns:
                 if column =='time':continue
-                resampler = interpolate.interp1d(data.time.values, data[column].values, kind='linear')
-                resampled_data[column] = np.nan_to_num( resampler(resampled_data.time.values) )
-                # resampled_data[column] = signal.savgol_filter( resampled_data[column], window_length=window_length, polyorder=1, axis=0)             
-            data = resampled_data      
+                val_old = np.array(list( data[column].values))                 
+                if val_old.ndim > 1:
+                    nc = val_old.shape[1]
+                    val_new = np.zeros((len(time_new), nc))
+                    for n in range(nc):
+                        resampler = interpolate.interp1d(time, val_old[:,n], kind=sampler_kind)
+                        val_new[:,n] = np.nan_to_num( resampler(time_new) )         
+                else:
+                    resampler = interpolate.interp1d(time, val_old, kind=sampler_kind)
+                    val_new = np.nan_to_num( resampler(time_new) ) 
+                resampled_data[column] = list(val_new)                
+            return resampled_data
 
         return data
     ################################################################################################################################################
-    def get_motion(self, dataset_name, file_name, window_length=11, ref_node_data=None):   
+    def get_motion(self, dataset_name, file_name, window_length=5, ref_node_data=None):   
         markers_file_path = get_markers_file_path(dataset_name, file_name)  
         raw_df  = pd.read_csv(
             markers_file_path,                                                  # relative python path to subdirectory
@@ -98,23 +166,25 @@ class NODE(object):
         # Markers
         markers = [list(map(float, l.replace(']','').replace('[','').replace('\n','').split(", "))) for l in raw_df[self.markers_color].values]  
         markers_npy = np.array(markers).reshape(len(time), -1, 3)
-        # DON'T Smooth markers. markers can be switched in array and smoothing causes error    
 
         # Center    
         center = np.mean(markers_npy, axis=1)         
         center = np.nan_to_num(center)
-        center = signal.savgol_filter( center, window_length=window_length, polyorder=1, axis=0)     
+        center = signal.medfilt(center, [window_length,1])
 
         # Norm
         norm = np.cross( markers_npy[:,1,:] - markers_npy[:,0,:], markers_npy[:,2,:] - markers_npy[:,0,:])
+        idx = norm[:,2]<0
+        for i in range(3): norm[idx,i] *= -1
+        norm = signal.medfilt(norm, [window_length,1])
+
         # norm[ norm[:,2]<0, :] *= -1   # Don't use ! 
         norm = norm / ( np.reshape(np.linalg.norm(norm, axis=1), (-1,1)) * np.ones((1,3)))
-        # DOn't smooth norm 
-        
+
         if ref_node_data is None:            
             return pd.DataFrame({
                 'time': time,
-                'markers': markers,
+                'markers': list(markers),
                 'center': list(center), 
                 'norm': list(norm)
                 })    
@@ -134,16 +204,19 @@ class NODE(object):
             ang_misalignment.append(xRotAngle)
 
         # # Smoothing (smooth these params after all calculation)               
-        distance = signal.savgol_filter( distance, window_length=window_length, polyorder=1, axis=0)                        
-        lat_misalignment = signal.savgol_filter( lat_misalignment, window_length=window_length, polyorder=1, axis=0)        
-        ang_misalignment = signal.savgol_filter( ang_misalignment, window_length=window_length, polyorder=1, axis=0)  
+        # distance = signal.savgol_filter( distance, window_length=window_length, polyorder=1, axis=0)                        
+        # lat_misalignment = signal.savgol_filter( lat_misalignment, window_length=window_length, polyorder=1, axis=0)        
+        # ang_misalignment = signal.savgol_filter( ang_misalignment, window_length=window_length, polyorder=1, axis=0)  
        
         return pd.DataFrame({
             'time': time,
             'distance': list(distance),
             'lat_misalignment': list(lat_misalignment),
-            'ang_misalignment': list(ang_misalignment)
-            })                      
+            'ang_misalignment': list(ang_misalignment),                        
+            'markers': list(markers),
+            'center': list(center), 
+            'norm': list(norm)  
+                })                                
     ################################################################################################################################################
     def get_rssi(self, dataset_name, file_name, window_length=11):
         # Load data 
@@ -190,61 +263,8 @@ class NODE(object):
             'time':time,
             'vind':vind_df.tolist() 
             })
-####################################################################################################################################################
-class SYSTEM(object):
-    ################################################################################################################################################
-    def __init__(self, dataset_name=None):
-        self.reader = None
-        self.tags = list()
-        self.dataset_name = None
-        
-        if dataset_name is not None:
-            self.dataset_name = dataset_name
-            system_info = get_sys_info(dataset_name)    
-            for idx in system_info.index:                
-                node_info = system_info.loc[idx, system_info.columns!='type'].to_dict()                
-                for key,value in node_info.items():
-                    if value == 'None': node_info.update({key: None})
-                
-                node = NODE( **node_info )
-                if system_info.loc[idx, 'type'] == 'tag': self.tags.append(node)
-                else: self.reader = node
-        return
-    ################################################################################################################################################
-    def add_reader(self, reader_markers_color):
-        self.reader = NODE( reader_markers_color )
-        return
-    ################################################################################################################################################
-    def add_tag(self, markers_color, IDD=None, port=None):
-        self.tags.append( NODE(markers_color, IDD=IDD, port=port) )   
-        return               
-    ################################################################################################################################################
-    def get_data(self, file_name=None, save=False, resample_dt=None):
-        if file_name is None: file_name_list = [file_path.replace("\\","/").split('/')[-1][:-4] for file_path in glob.glob(get_markers_file_path(self.dataset_name, '')[:-4]+'*.csv')]
-        else: file_name_list = [file_name ]
-        
-        dataset = list()
-        for fn in file_name_list:
-            start_time, data = np.inf, list()
-            
-            reader_data = self.reader.get_data(self.dataset_name, fn)                      
-            for i, tag in enumerate(self.tags):
-                tag_data = tag.get_data(self.dataset_name, fn, ref_node_data=reader_data, resample_dt=resample_dt)
-                start_time = min(start_time, tag_data.time.iloc[0]) 
-                data.append(tag_data)
-
-            for i, tag_data in enumerate(data): 
-                tag_data.time -= start_time
-                dataset.append(tag_data)
-                        
-                if save: 
-                    file_path = get_dataset_folder_path(self.dataset_name) + '/' + fn + '_' + self.tags[i].markers_color + '.csv'
-                    create_folder(file_path)
-                    tag_data.to_csv(file_path, index=None)            
-
-        return dataset
-####################################################################################################################################################
-
+################################################################################################################################################
+ 
 
 
 ####################################################################################################################################################
@@ -300,8 +320,8 @@ class SYNTHESIZER(object):
         self.vae.fit(train_data_normalized, train_data_normalized, epochs=epochs, validation_data=(train_data_normalized, train_data_normalized), verbose=0)
         return    
     ################################################################################################################################################
-    def generate(self, N, train_data=None, window_length=11):
-        if train_data is not None: self.train(train_data)
+    def generate(self, N, train_data=None, window_length=11, epochs=500):
+        if train_data is not None: self.train(train_data, epochs=epochs)
 
         synth_data = self.decoder.predict(np.random.multivariate_normal( [0]*self.latentdim, np.eye(self.latentdim), N))
         synth_data = signal.savgol_filter( synth_data, window_length=window_length, polyorder=1, axis=1)     
@@ -327,9 +347,11 @@ def calculate_params(loc_1_, align_1_, loc_2_, align_2_):
     loc_2_new = np.matmul(Rtot, np.reshape(loc_2-loc_1, [3,1]))    
     align_2_new = np.matmul(Rtot, np.reshape(align_2, [3,1]))    
 
-    coilsDistance = abs(np.round(np.reshape(loc_2_new, [1,3])[0], 10))
-    xRotAngle = np.round( atan(abs( align_2_new[1]/align_2_new[2] )) * 180/pi )
+    # coilsDistance = abs(np.round(np.reshape(loc_2_new, [1,3])[0], 10))
     # xRotAngle = np.round( atan(-align_2_new[1]/align_2_new[2]) * 180/pi )
+
+    coilsDistance = np.round(np.reshape(loc_2_new, [1,3])[0], 10)
+    xRotAngle = np.round( atan(abs( align_2_new[1]/align_2_new[2] )) * 180/pi )
 
     return coilsDistance, xRotAngle
 ####################################################################################################################################################
@@ -343,31 +365,12 @@ def get_rotationMatrix(XrotAngle, YrotAngle, ZrotAngle):
 
 
 ################################################################################################################################################
-if __name__ == '__main__':
+# if __name__ == '__main__':
     # Get data from raw measured data and Save as CSV file to load faster for regression    
-    sys = SYSTEM('arduino_00')
+    # sys = SYSTEM('arduino_02')
     # data = sys.get_data(save=False, resample_dt=None)
     # print(data[0])
 
     # generate_synth_motion_data(train_dataset_name_list=['arduino_00','arduino_01','arduino_02'], save_dataset_name='synth_01', N=2000)
-
-    for n in range(9):
-        data = sys.get_data(file_name='record_1'+str(n), save=False, resample_dt=.1)
-        c1 = data[0]
-        c2 = data[1]
-
-        # feat = 'distance'
-        # ax = c1.plot(x='time', y=feat)
-        # c2.plot(x='time', y=feat, ax=ax)
-
-        d = abs(c1.distance - c2.distance)
-        ld = abs(c1.lat_misalignment-c2.lat_misalignment)
-
-        plt.plot(d)
-        plt.plot(ld)
-
-        plt.show()
-
-
 ################################################################################################################################################
         
