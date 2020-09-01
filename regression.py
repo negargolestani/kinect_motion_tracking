@@ -4,7 +4,7 @@ from utils import*
 eps = 1e-12
 
 ####################################################################################################################################################
-def load_dataset(dataset_name, resample_dt=None, as_dict=True):
+def load_dataset_(dataset_name, resample_dt=None, as_dict=True):
     dataset_type = dataset_name.split('_')[0]
 
     if dataset_type == 'arduino' or dataset_type =='meas':
@@ -33,7 +33,7 @@ def load_dataset_synth(dataset_name, resample_dt=None, as_dict=True):
         dataset.append(data_df)    
     return dataset
 ####################################################################################################################################################
-def load_dataset_meas(dataset_name, resample_dt=None, as_dict=True):
+def load_dataset(dataset_name, resample_dt=None, as_dict=True):
     dataset = list()
     for file_path in glob.glob(get_dataset_folder_path(dataset_name) +'/*.csv'):        
         data = pd.read_csv(file_path)

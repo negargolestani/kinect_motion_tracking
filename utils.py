@@ -46,6 +46,7 @@ main_directory = str( Path(__file__).parents[1] )
 datime_format = '%H:%M:%S.%f'
 dataset_folder_name = 'dataset'
 synth_dataset_folder_name = 'synthetic_dataset'
+eps = 1e-20
 
 ####################################################################################################################################################
 def get_time_file_path(dataset_name, file_name):
