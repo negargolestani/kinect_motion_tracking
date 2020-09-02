@@ -2,6 +2,8 @@
 from utils import*
 
 
+
+
 ####################################################################################################################################################
 def load_dataset(dataset_name, resample_dt=None, as_dict=True):
     converters = {key:lambda x: list(map(float, x.strip('[]').split())) for key in ['norm', 'center_1', 'center_2']}
@@ -19,11 +21,6 @@ def load_dataset(dataset_name, resample_dt=None, as_dict=True):
                 # resampled_data[column] = signal.savgol_filter( resampled_data[column], window_length=window_length, polyorder=1, axis=0)             
             data = resampled_data        
         dataset.append(data)
-
-    if as_dict:
-        dataset_dict = dict()
-        for column in dataset[0].columns: dataset_dict.update({ column : np.array([ data[column].values for data in dataset]) })
-        return dataset_dict
 
     return dataset
 ####################################################################################################################################################
@@ -44,8 +41,8 @@ def get_delay(x, y):
 class DATA(object):    
     ######################################################################################################
     def __init__(self, X=[], Y=[]):            
-        # self.X = np.array(X)  
-        self.X = np.array(X) / (1+eps)  # Don't know why !!!  have to divide to handle pycaret error in training 
+        self.X = np.array(X)  
+        # self.X = np.array(X) / (1+eps)  # Don't know why !!!  have to divide to handle pycaret error in training 
         self.Y = np.array(Y)        
         return
     ######################################################################################################        
