@@ -141,7 +141,7 @@ class SYSTEM(object):
         if save: 
             file_path = get_dataset_folder_path(self.dataset_name) + '/' + file_name + '.csv'
             create_folder(file_path)
-            data.to_csv(file_path, index=None) 
+            data.to_csv(file_path, index=False, sep=",") 
 
         return data
     ################################################################################################################################################    
@@ -168,8 +168,8 @@ class NODE(object):
     def load_markers(self, dataset_name, file_name):   
         markers_file_path = get_markers_file_path(dataset_name, file_name)  
         raw_df  = pd.read_csv(
-            markers_file_path,                                                  # relative python path to subdirectory
-            usecols = ['time', self.color],                             # Only load the three columns specified.
+            markers_file_path,                                            # relative python path to subdirectory
+            usecols = ['time', self.color],                               # Only load the three columns specified.
             parse_dates = ['time'] )         
 
         # Time
@@ -178,6 +178,7 @@ class NODE(object):
         
         # Markers
         markers = [list(map(float, l.replace(']','').replace('[','').replace('\n','').split(", "))) for l in raw_df[self.color].values]  
+        # markers = raw_df[self.color].apply(literal_eval).to_list()
         markers_npy = np.array(markers).reshape(len(time), -1, 3)
         
         return pd.DataFrame({
@@ -276,6 +277,7 @@ def generate_synth_motion_data(train_dataset_name_list, save_dataset_name=None, 
     if save_dataset_name is not None:
         folder_path = get_dataset_folder_path(save_dataset_name) 
         create_folder(folder_path + '/tst.csv')
+        time = np.arange(Nt) * resample_dt
         
         for n in range(norm_synth.shape[0]):
             file_path = folder_path + '/record_' + "{0:0=3d}".format(n) + '.csv'

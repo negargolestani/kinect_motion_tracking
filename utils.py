@@ -23,6 +23,7 @@ from math import*
 import pywt
 from itertools import chain, combinations
 from numpy.fft import fft, ifft, fft2, ifft2, fftshift
+from ast import literal_eval
 
 import tensorflow as tf
 from keras.models import Sequential, Model
@@ -46,7 +47,7 @@ main_directory = str( Path(__file__).parents[1] )
 datime_format = '%H:%M:%S.%f'
 dataset_folder_name = 'dataset'
 synth_dataset_folder_name = 'synthetic_dataset'
-eps = 1e-20
+eps = 1e-12
 
 ####################################################################################################################################################
 def get_time_file_path(dataset_name, file_name):
