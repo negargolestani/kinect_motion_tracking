@@ -40,24 +40,43 @@ def get_delay(x, y):
 ####################################################################################################################################################
 class DATA(object):    
     ######################################################################################################
-    def __init__(self, X=[], Y=[]):            
-        self.X = np.array(X)  
-        # self.X = np.array(X) / (1+eps)  # Don't know why !!!  have to divide to handle pycaret error in training 
-        self.Y = np.array(Y)        
+    def __init__(self, X=[], Y=[], dataset_name=None, **params): 
+        if dataset_name is not None:
+            self.load( dataset_name, **params)   
+        else:
+            self.X = np.array(X)  
+            self.Y = np.array(Y)        
         return
+    ######################################################################################################
+    def load( self, dataset_name, features=['synth_vind_1', 'synth_vind_2'], target='center_1'):
+        
+        dataset_df_list = load_dataset(dataset_name, as_dict=False)
+        self.X, self.Y = list(), list()
+        for data in dataset_df_list:
+            x = np.zeros((len(data), len(features)))
+            for i, feature in enumerate(features): x[:,i] = data[feature].to_list()
+            y = np.linalg.norm( np.array( data[target].to_list() ), axis=1)
+            
+            self.X.append(x)
+            self.Y.append(y)
+        
+        self.X = np.array(self.X)
+        self.Y = np.array(self.Y)
+        return         
     ######################################################################################################        
     def segment(self, win_size, step=None, as_df=False):
         if step is None: step = win_size        
         
         X, Y = list(), list()
+        N, Nt, Nf = np.shape(self.X)
         for t in range(0, self.X.shape[1] - win_size, step): 
-            X = [*X, *self.X[:,t:t+win_size]]
+            X = [*X, *self.X[:,t:t+win_size,:].reshape(N,-1)]
             Y = [*Y, *self.Y[:,t+win_size]]           
         data_segmented = DATA(X, Y)
        
         if as_df:
             data_df = pd.DataFrame( np.concatenate([data_segmented.X, np.reshape(data_segmented.Y,(-1,1))], axis=1) )
-            data_df.columns = [*['feature_'+str(i) for i in range(win_size)], 'target']
+            data_df.columns = [*['feature_'+str(i) for i in range(win_size*Nf)], 'target']
             return data_df
 
         return data_segmented            
@@ -91,23 +110,19 @@ class DATA(object):
         data_mtx = copy.deepcopy(self)
         if len(np.shape(data_mtx.X))>1:  return data_mtx    
 
-        Nt_list = [np.shape(x)[0] for x in self.X]
-        Nt = int( eval('np.' + Nt_mtx)(Nt_list) )
-        Nd = len(self.X)
-        
-        data_mtx.X = np.zeros( (Nd,Nt) )
-        data_mtx.Y = np.zeros( (Nd,Nt) )
-        
+        Nd, Nf = len(self.X),  np.shape(self.X[0])[1]
+        Nt_list = list()
+        for x in self.X: Nt_list.append( np.shape(x)[0] )
+        if type(Nt_mtx) is str: Nt = int( eval('np.' + Nt_mtx)(Nt_list) )
+        else:  Nt = Nt_mtx
+        data_mtx.X = np.zeros( (Nd,Nt,Nf) )
         for idx, x in enumerate(self.X): 
+            # x = np.subtract(x,np.mean(x,axis=0))        
             nt = np.shape(x)[0]
-            
             if Nt >= nt:
-                data_mtx.X[idx,:nt] = x
-                data_mtx.Y[idx,:nt] = self.Y[idx]
-                
+                data_mtx.X[idx,:,:] = np.pad( x, ((0,Nt-nt),(0,0)),'constant')
             else:
-                data_mtx.X[idx,:] = x[:Nt]
-                data_mtx.Y[idx, :] = self.Y[idx][:Nt]
+                data_mtx.X[idx,:,:] = x[:Nt,:]
         return data_mtx
     ######################################################################################################
     def bound(self, min_value=None, max_value=None):
@@ -169,29 +184,25 @@ class DATA(object):
     def filter_noise(self, window_length=5, polyorder=2):
         filtered_data = copy.deepcopy(self)
         for n, x in enumerate(self.X):
-            for i in range(8):
+            for i in range(np.shape(x)[1]):
                 filtered_data.X[n][:,i] = signal.savgol_filter(x[:,i], window_length, polyorder)        
         return filtered_data
     ######################################################################################################
     def MinMax(self):
         # Rescale data value to (0,1)
-        MIN, MAX = np.inf, -np.inf 
         normalized_data = copy.deepcopy(self)
         for idx, x in enumerate(normalized_data.X): 
-            MIN = min(MIN,np.nanmin(x,axis=0))
-            MAX = max(MAX, np.nanmax(x,axis=0))
-
-        for idx, x in enumerate(normalized_data.X): 
+            MIN = np.nanmin(x,axis=0)
+            MAX = np.nanmax(x,axis=0)
             normalized_data.X[idx] = np.subtract(x,MIN) / ( np.subtract(MAX,MIN) + eps )
-        # normalized_data.X = (self.X - np.min(self.X))/(np.max(self.X)-np.min(self.X))
         return normalized_data    
     ######################################################################################################
     def standardize(self, scale=True):
         normalized_data = copy.deepcopy(self)
         STD = 1
         for idx, x in enumerate(normalized_data.X): 
-            MEAN = np.nanmean(x,axis=0)
-            if scale: STD = np.nanstd(x,axis=0) + eps
+            MEAN = np.mean(x,axis=0)
+            if scale: STD = np.std(x,axis=0) + eps
             normalized_data.X[idx] = np.subtract(x,MEAN) / STD    
         return normalized_data         
 ####################################################################################################################################################
