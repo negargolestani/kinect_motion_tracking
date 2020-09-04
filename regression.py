@@ -36,7 +36,6 @@ def get_delay(x, y):
     return delay
 ####################################################################################################################################################
 
-
 ####################################################################################################################################################
 class DATA(object):    
     ######################################################################################################
@@ -63,23 +62,38 @@ class DATA(object):
         self.X = np.array(self.X)
         self.Y = np.array(self.Y)
         return         
-    ######################################################################################################        
-    def segment(self, win_size, step=None, as_df=False):
-        if step is None: step = win_size        
-        
+    ######################################################################################################
+    def segment(self, win_size, step=None, as_df=False, merge=True):
+        # returns Nsample list of n * win_size * Nf   where n is number of segments extracted from Nt samples 
+        if step is None: step = win_size                
         X, Y = list(), list()
-        N, Nt, Nf = np.shape(self.X)
-        for t in range(0, self.X.shape[1] - win_size, step): 
-            X = [*X, *self.X[:,t:t+win_size,:].reshape(N,-1)]
-            Y = [*Y, *self.Y[:,t+win_size]]           
+        for (x,y) in zip(self.X, self.Y):
+            Nt = np.shape(x)[0]
+            # x_s = [ x[t:t+win_size,:] for t in range(0, Nt-win_size, step) ]
+            # y_s = [ y[t+win_size] for t in range(0, Nt-win_size, step) ]
+            x_s = [ x[t:t+win_size,:] for t in range(0, Nt-win_size+1, step) ]
+            y_s = [ y[t+win_size-1] for t in range(0, Nt-win_size+1, step) ]
+            X.append(x_s)
+            Y.append(y_s)
         data_segmented = DATA(X, Y)
-       
-        if as_df:
-            data_df = pd.DataFrame( np.concatenate([data_segmented.X, np.reshape(data_segmented.Y,(-1,1))], axis=1) )
-            data_df.columns = [*['feature_'+str(i) for i in range(win_size*Nf)], 'target']
-            return data_df
 
-        return data_segmented            
+        if as_df:            
+            if data_segmented.X.ndim == 1:            
+                Nf = np.shape(data_segmented.X[0])[2]
+                data_segmented_list = list()
+                for (x,y) in zip(data_segmented.X, data_segmented.Y):
+                    data_df = pd.DataFrame( np.concatenate( [np.reshape(x, (-1, Nf*win_size)), np.reshape(y, (-1,1))], axis=1) )
+                    data_df.columns = [*['feature_'+str(i) for i in range(win_size*Nf)], 'target']
+                    data_segmented_list.append(data_df)
+                return data_segmented_list
+
+            if data_segmented.X.ndim == 4:            
+                Nf = np.shape(data_segmented.X)[3]                
+                data_segmented_df = pd.DataFrame( np.concatenate( [data_segmented.X.reshape(-1, Nf*win_size), data_segmented.Y.reshape(-1,1)], axis=1) )
+                data_segmented_df.columns = [*['feature_'+str(i) for i in range(win_size*Nf)], 'target']
+                return data_segmented_df
+
+        return data_segmented         
     ######################################################################################################
     def merge(self, new_dataset):
         merged_dataset = copy.deepcopy(self)
@@ -116,13 +130,17 @@ class DATA(object):
         if type(Nt_mtx) is str: Nt = int( eval('np.' + Nt_mtx)(Nt_list) )
         else:  Nt = Nt_mtx
         data_mtx.X = np.zeros( (Nd,Nt,Nf) )
-        for idx, x in enumerate(self.X): 
+        data_mtx.Y = np.zeros( (Nd,Nt) )
+        for idx, (x,y) in enumerate(zip(self.X, self.Y)): 
             # x = np.subtract(x,np.mean(x,axis=0))        
             nt = np.shape(x)[0]
             if Nt >= nt:
-                data_mtx.X[idx,:,:] = np.pad( x, ((0,Nt-nt),(0,0)),'constant')
+                # data_mtx.X[idx,:,:] = np.pad( x, ((0,Nt-nt),(0,0)),'constant')
+                data_mtx.X[idx,:nt,:] = x
+                data_mtx.Y[idx,:nt] = y
             else:
-                data_mtx.X[idx,:,:] = x[:Nt,:]
+                data_mtx.X[idx,:] = x[:Nt,:]
+                data_mtx.Y[idx,:] = y[:Nt]
         return data_mtx
     ######################################################################################################
     def bound(self, min_value=None, max_value=None):
@@ -206,7 +224,6 @@ class DATA(object):
             normalized_data.X[idx] = np.subtract(x,MEAN) / STD    
         return normalized_data         
 ####################################################################################################################################################
-
 
 ####################################################################################################################################################
 class REGRESSOR(object):

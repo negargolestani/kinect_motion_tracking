@@ -280,7 +280,7 @@ def generate_synth_motion_data(train_dataset_name_list, save_dataset_name=None, 
         time = np.arange(Nt) * resample_dt
         
         for n in range(norm_synth.shape[0]):
-            file_path = folder_path + '/record_' + "{0:0=3d}".format(n) + '.csv'
+            file_path = folder_path + '/record_' + "{0:0=4d}".format(n) + '.csv'
             data = pd.DataFrame({
                 'time': time,
                 'norm': list(norm_synth[n]),
