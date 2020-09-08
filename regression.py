@@ -36,6 +36,7 @@ def get_delay(x, y):
     return delay
 ####################################################################################################################################################
 
+
 ####################################################################################################################################################
 class DATA(object):    
     ######################################################################################################
@@ -51,11 +52,16 @@ class DATA(object):
         
         dataset_df_list = load_dataset(dataset_name, as_dict=False)
         self.X, self.Y = list(), list()
+
         for data in dataset_df_list:
+            
             x = np.zeros((len(data), len(features)))
             for i, feature in enumerate(features): x[:,i] = data[feature].to_list()
-            y = np.linalg.norm( np.array( data[target].to_list() ), axis=1)
-            
+
+            y = np.array( data[target].to_list() )
+            if target == 'center_1' or target =='center_2': y = np.linalg.norm( y, axis=1)
+            elif target == 'norm': y = np.arccos( y[:,2]) * 180/pi
+
             self.X.append(x)
             self.Y.append(y)
         
@@ -63,7 +69,7 @@ class DATA(object):
         self.Y = np.array(self.Y)
         return         
     ######################################################################################################
-    def segment(self, win_size, step=None, as_df=False, merge=True):
+    def segment(self, win_size, step=None):
         # returns Nsample list of n * win_size * Nf   where n is number of segments extracted from Nt samples 
         if step is None: step = win_size                
         X, Y = list(), list()
@@ -75,25 +81,19 @@ class DATA(object):
             y_s = [ y[t+win_size-1] for t in range(0, Nt-win_size+1, step) ]
             X.append(x_s)
             Y.append(y_s)
-        data_segmented = DATA(X, Y)
-
-        if as_df:            
-            if data_segmented.X.ndim == 1:            
-                Nf = np.shape(data_segmented.X[0])[2]
-                data_segmented_list = list()
-                for (x,y) in zip(data_segmented.X, data_segmented.Y):
-                    data_df = pd.DataFrame( np.concatenate( [np.reshape(x, (-1, Nf*win_size)), np.reshape(y, (-1,1))], axis=1) )
-                    data_df.columns = [*['feature_'+str(i) for i in range(win_size*Nf)], 'target']
-                    data_segmented_list.append(data_df)
-                return data_segmented_list
-
-            if data_segmented.X.ndim == 4:            
-                Nf = np.shape(data_segmented.X)[3]                
-                data_segmented_df = pd.DataFrame( np.concatenate( [data_segmented.X.reshape(-1, Nf*win_size), data_segmented.Y.reshape(-1,1)], axis=1) )
-                data_segmented_df.columns = [*['feature_'+str(i) for i in range(win_size*Nf)], 'target']
-                return data_segmented_df
-
-        return data_segmented         
+        return DATA(X, Y)         
+    ######################################################################################################
+    def get_features(self):
+        features = np.array([ get_features_sample(x) for x in self.X ])
+        return DATA(X=features, Y=self.Y)
+    ######################################################################################################
+    def get_df(self):
+        X = np.concatenate( self.X, axis=0)
+        Nf = X.shape[1]*X.shape[2]
+        X = X.reshape(-1, Nf)
+        data_df = pd.DataFrame( X, columns=['feature_'+str(i) for i in range(Nf)] )
+        data_df['target'] = np.concatenate( self.Y, axis=0)
+        return data_df
     ######################################################################################################
     def merge(self, new_dataset):
         merged_dataset = copy.deepcopy(self)
@@ -110,7 +110,7 @@ class DATA(object):
     def split(self, ratio):
         N = len(self.X)
         idxs = np.arange(N)
-        random.shuffle(idxs)
+        # random.shuffle(idxs)
         
         Ntrain = int(N*ratio)
         data_p1 = self.select(idxs[:Ntrain])
@@ -224,65 +224,112 @@ class DATA(object):
             normalized_data.X[idx] = np.subtract(x,MEAN) / STD    
         return normalized_data         
 ####################################################################################################################################################
+def get_features_sample(x_t):
+    features = list()   
+    axis = -2
+    x_f = np.real( np.fft.fft(x_t, axis=axis) )
+    x_wA, x_wD = pywt.dwt(x_t, 'db1', axis=axis)
+    dx_t = np.diff( x_t, axis=axis )
+    for x_ in [x_t, x_f, x_wA, x_wD, dx_t]:                                    
+        features.append( np.mean( x_, axis=axis)) 
+        features.append( np.std( x_, axis=axis ))                               
+        features.append( np.median( x_, axis=axis ))               
+        features.append( np.min( x_, axis=axis ))               
+        features.append( np.max( x_, axis=axis ))               
+        features.append( np.var( x_, axis=axis ))               
+        features.append( np.percentile( x_, 25, axis=axis ))               
+        features.append( np.percentile( x_, 75, axis=axis ))               
+        features.append( stats.skew( x_, axis=axis))               
+        features.append( stats.kurtosis( x_, axis=axis))               
+        features.append( stats.iqr( x_, axis=axis))               
+        features.append( np.sqrt(np.mean(np.power(x_,2), axis=axis)))   
+    features = np.concatenate(np.array(features), axis=-1)
+
+    if np.ndim(features) == 1: return features.reshape(60,2)
+    return features.reshape(-1, 60, 2)
+
+    # if np.ndim(features) == 1: return features.reshape(-1,1)
+    # N, Nf = np.shape(features)
+    # return features.reshape(N, Nf, 1)
+####################################################################################################################################################
+
+
 
 ####################################################################################################################################################
-class REGRESSOR(object):
-    ################################################################################################################################################
-    def __init__(self, win_size, step=1, **params ):
+class RNN(object):
+    ######################################################################################################    
+    def __init__(self, win_size, Nfeatures, **params ):
         np.random.seed(7)        
         self.win_size = win_size
-        self.step = step                
+        self.Nfeatures = Nfeatures
         self.build_model(**params)
-    ################################################################################################################################################
-    def train(self, train_data, epochs=30, verbose=0, show=True):        
-        loss = list()        
-        for n_epoch in range(epochs):
-            display(n_epoch)
-            
-            ep_loss = list()            
-            for i in range(0, np.shape(train_data.X)[1]-self.win_size, self.step):
-                history = self.model.fit( 
-                    train_data.X[:, i:i+self.win_size,:], 
-                    train_data.Y[:, i+self.win_size-1], 
-                    epochs = 1, 
-                    verbose = verbose
-                )    
-                ep_loss.append(history.history['loss'])
-            
-            loss.append(ep_loss)
-            clear_output(wait=True)
-            
-            if show:
-                plt.plot( np.ndarray.flatten( np.array(loss)) )
-                plt.show()
-                
-        return np.array(loss)
-    ################################################################################################################################################    
-    def predict(self, X):
-        predictions = list()
-        for i in range(0, np.shape(X)[1]-self.win_size, self.step):
-            pred = self.model.predict( X[:, i:i+self.win_size,:])
-            predictions.append(pred)
-        
-        predictions = np.array(predictions)
-        return predictions.reshape((-1, np.shape(predictions)[1])).transpose()  
-####################################################################################################################################################
-class RNN(REGRESSOR):
-    def build_model(self, Nunits=3, activation='linear'):        
+    ######################################################################################################
+    def build_model(self, Nunits=3, NhiddenLayers=1, activation='softmax', optimizer='RMSprop', loss='mean_squared_error', dropout=0):        
         self.model = Sequential()           
-        self.model.add( LSTM(units=Nunits, activation=activation, return_sequences=True, input_shape=(self.win_size, )) )        
-        self.model.add( LSTM(units=Nunits, activation=activation, return_sequences=True) )        
-        self.model.add( LSTM(units=Nunits, activation=activation))   
-        # self.model.add(Dropout(0.1))
-        self.model.add( Dense(1))          
-            
-        self.model.compile(loss='mse', optimizer='adam')         
+        self.model.add( LSTM(units=Nunits, input_shape=(self.win_size, self.Nfeatures), return_sequences=True, dropout=dropout) )    
+        for n in range(NhiddenLayers): 
+            self.model.add( LSTM(units=Nunits, return_sequences=True, dropout=dropout) )        
+        self.model.add( LSTM(units=Nunits, dropout=dropout) ) 
+        # self.model.add( BatchNormalization() )          
+        self.model.add( Dense(1, activation=activation) )                      
+        self.model.compile(loss=loss, optimizer=optimizer)  
         print(self.model.summary())        
         return 
+    ######################################################################################################
+    def train(self, train_data, step=None, **params): 
+        if step is None: step = self.win_size            
+        train_data_sg = train_data.segment(self.win_size, step)
+        history = self.model.fit( 
+            np.concatenate( train_data_sg.X, axis=0), 
+            np.concatenate( train_data_sg.Y, axis=0).reshape(-1,1), 
+            **params) 
+        return history
+    ######################################################################################################    
+    def predict(self, X, window_length=None):
+        predictions = list()
+        for x in X:
+            pred = np.array([self.model.predict( np.reshape(x[t:t+self.win_size,:],[1,self.win_size, -1]) ) for t in range(np.shape(x)[0]-self.win_size)]).flatten()
+            if window_length is not None: pred = signal.savgol_filter( pred, window_length=window_length, polyorder=1)       
+            predictions.append( pred )  
+        return predictions 
 ####################################################################################################################################################
-class TCN(REGRESSOR):
-    def build_model(self, Nlayers=2, nb_filters=5, activation=None, optimizer='adam', loss='mse' ):  
-        i = tf.keras.Input(batch_shape=(None, self.win_size)) 
+class CNN(object):
+        ######################################################################################################    
+    def __init__(self, win_size, Nfeatures, **params ):
+        np.random.seed(7)        
+        self.win_size = win_size
+        self.Nfeatures = Nfeatures
+        self.build_model(**params)
+    ######################################################################################################
+    def build_model(self, stride=None, activation='softmax', optimizer='RMSprop', loss='mean_squared_error', dropout=0):                   
+        self.model = Sequential()
+        self.model.add(Conv2D(64, kernel_size=3, stride=stride, activation='linear', padding='same', input_shape=(self.win_size, self.Nfeatures)))
+        # self.model.add(Conv2D(64, kernel_size=3, activation='linear', padding='same'))
+        self.model.add(MaxPooling2D(pool_size=2))
+        self.model.add(BatchNormalization())
+        self.model.add(Flatten())
+        self.model.add(Dense(512, activation=activation))
+        self.model.add(Dropout(dropout))
+        self.model.add(Dense(1))                     
+        self.model.compile(loss=loss, optimizer=optimizer)  
+        print(self.model.summary())        
+        return 
+    ######################################################################################################
+    def train(self, train_data, **params): 
+        history = self.model.fit( train_data.X, train_data.Y, **params) 
+        return history
+    ######################################################################################################    
+    def predict(self, X, window_length=None):
+        predictions = list()
+        for x in X:
+            pred = np.array([self.model.predict( np.reshape(x[t:t+self.win_size,:],[1,self.win_size, -1]) ) for t in range(np.shape(x)[0]-self.win_size)]).flatten()
+            if window_length is not None: pred = signal.savgol_filter( pred, window_length=window_length, polyorder=1)       
+            predictions.append( pred )  
+        return predictions 
+####################################################################################################################################################
+class TCN(object):
+    def build_model(self, Nlayers=2, nb_filters=5, Nfeatures=2, activation=None, optimizer='adam', loss='mse' ):  
+        i = tf.keras.Input(batch_shape=(None, self.win_size, Nfeatures)) 
         if Nlayers>1:
             o = tcn.TCN(nb_filters=nb_filters, return_sequences=True)(i)
             for n in range(Nlayers-2): tcn.TCN(nb_filters=nb_filters, return_sequences=True)(o)    
@@ -293,7 +340,8 @@ class TCN(REGRESSOR):
         o = tf.keras.layers.Dense(1, activation=activation)(o)
         self.model = tf.keras.Model(inputs=[i], outputs=[o])
         
-        self.model.compile(loss='mse', optimizer='adam')        
+        self.model.compile(loss='mse', optimizer='adam')
+        
         print(self.model.summary())                
         return 
 ####################################################################################################################################################

@@ -27,7 +27,7 @@ from ast import literal_eval
 
 import tensorflow as tf
 from keras.models import Sequential, Model
-from keras.layers import Input, Dense, Lambda, Layer, Add, Multiply, LSTM, SimpleRNN, Dropout
+from keras.layers import Input, Dense, Lambda, Layer, Add, Multiply, LSTM, SimpleRNN, Dropout, BatchNormalization, MaxPooling1D, Flatten, Conv1D, Conv2D
 from sklearn.metrics import*
 from keras import backend as K
 from pycaret.regression import*
