@@ -6,10 +6,23 @@ from utils import*
 
 ####################################################################################################################################################
 def load_dataset(dataset_name, resample_dt=None, as_dict=True):
-    converters = {key:lambda x: list(map(float, x.strip('[]').split())) for key in ['norm', 'center_1', 'center_2']}
+    file_path_list = glob.glob(get_dataset_folder_path(dataset_name) +'/*.csv')
+    
+    data = pd.read_csv(file_path_list[0])
+    columns = list(set(['time', *data.filter(regex='norm').columns, *data.filter(regex='center_').columns, *data.filter(regex='vind').columns]))
+    
+    converters = dict()
+    for column in columns:
+        val = data.loc[0,column]
+        if type(val) == str:
+            if ',' in val: converters.update({ column: literal_eval })
+            else: converters.update({ column:lambda x: list(map(float, x.strip('[]').split())) })
+    
+    # converters = {key:lambda x: list(map(float, x.strip('[]').split())) for key in ['norm', 'center_1', 'center_2']}
+    # converters = {key:literal_eval for key in ['norm', 'center_1', 'center_2']}
     
     dataset = list()
-    for file_path in glob.glob(get_dataset_folder_path(dataset_name) +'/*.csv'):        
+    for file_path in file_path_list:        
         data = pd.read_csv(file_path, converters=converters)
 
         if resample_dt is not None:
@@ -77,8 +90,8 @@ class DATA(object):
             Nt = np.shape(x)[0]
             # x_s = [ x[t:t+win_size,:] for t in range(0, Nt-win_size, step) ]
             # y_s = [ y[t+win_size] for t in range(0, Nt-win_size, step) ]
-            x_s = [ x[t:t+win_size,:] for t in range(0, Nt-win_size+1, step) ]
-            y_s = [ y[t+win_size-1] for t in range(0, Nt-win_size+1, step) ]
+            x_s = np.array([ x[t:t+win_size,:] for t in range(0, Nt-win_size+1, step) ])
+            y_s = np.array([ y[t+win_size-1] for t in range(0, Nt-win_size+1, step) ])
             X.append(x_s)
             Y.append(y_s)
         return DATA(X, Y)         
@@ -87,13 +100,27 @@ class DATA(object):
         features = np.array([ get_features_sample(x) for x in self.X ])
         return DATA(X=features, Y=self.Y)
     ######################################################################################################
-    def get_df(self):
-        X = np.concatenate( self.X, axis=0)
-        Nf = X.shape[1]*X.shape[2]
-        X = X.reshape(-1, Nf)
-        data_df = pd.DataFrame( X, columns=['feature_'+str(i) for i in range(Nf)] )
-        data_df['target'] = np.concatenate( self.Y, axis=0)
-        return data_df
+    def get_df(self, merge=False):
+        if merge:
+            X = np.concatenate( self.X, axis=0)
+            Nf = X.shape[1]*X.shape[2]
+            X = X.reshape(-1, Nf)
+            data_df = pd.DataFrame( X, columns=['feature_'+str(i) for i in range(Nf)] )
+            data_df['target'] = np.concatenate( self.Y, axis=0)  
+
+            return data_df
+
+        else:
+            data_df_list= list()
+            for (x,y) in zip(self.X, self.Y):
+                
+                Nf = x.shape[1]*x.shape[2]
+                x = x.reshape(-1, Nf)
+                data_df = pd.DataFrame( x, columns=['feature_'+str(i) for i in range(Nf)] )
+                data_df['target'] = y
+                data_df_list.append(data_df)
+
+            return data_df_list
     ######################################################################################################
     def merge(self, new_dataset):
         merged_dataset = copy.deepcopy(self)
