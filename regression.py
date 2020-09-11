@@ -61,20 +61,34 @@ class DATA(object):
             self.Y = np.array(Y)        
         return
     ######################################################################################################
-    def load( self, dataset_name, features=['synth_vind_1', 'synth_vind_2'], target='center_1'):
+    def load( self, dataset_name, features='synth_vind', target='center'):
         
         dataset_df_list = load_dataset(dataset_name, as_dict=False)
         self.X, self.Y = list(), list()
 
-        for data in dataset_df_list:
-            
-            x = np.zeros((len(data), len(features)))
-            for i, feature in enumerate(features): x[:,i] = data[feature].to_list()
+        for data in dataset_df_list:            
+            x = data.filter(regex=features).to_numpy()
+            y = np.nanmean(np.array([list(yn) for yn in data.filter(regex=target).to_numpy()]), axis=1)
 
-            y = np.array( data[target].to_list() )
-            if target == 'center_1' or target =='center_2': y = np.linalg.norm( y, axis=1)
+            if target == 'center': y = np.linalg.norm( y, axis=1)
             elif target == 'norm': y = np.arccos( y[:,2]) * 180/pi
+            self.X.append(x)
+            self.Y.append(y)
+        
+        self.X = np.array(self.X)
+        self.Y = np.array(self.Y)
+        return         
+    ######################################################################################################
+    def load_( self, dataset_name, features=['synth_vind_1', 'synth_vind_2'], target='center_1'):
+        
+        dataset_df_list = load_dataset(dataset_name, as_dict=False)
+        self.X, self.Y = list(), list()
 
+        for data in dataset_df_list:            
+            x = data.filter(regex=features).to_numpy()
+            y = np.array( data[target].to_list() )
+            if target[:6] == 'center': y = np.linalg.norm( y, axis=1)
+            elif target == 'norm': y = np.arccos( y[:,2]) * 180/pi
             self.X.append(x)
             self.Y.append(y)
         
@@ -89,7 +103,7 @@ class DATA(object):
         for (x,y) in zip(self.X, self.Y):
             Nt = np.shape(x)[0]
             # x_s = [ x[t:t+win_size,:] for t in range(0, Nt-win_size, step) ]
-            # y_s = [ y[t+win_size] for t in range(0, Nt-win_size, step) ]
+            # y_s = [ y[t+win_size] for t in range(0, Nt-win_size, step) ]                
             x_s = np.array([ x[t:t+win_size,:] for t in range(0, Nt-win_size+1, step) ])
             y_s = np.array([ y[t+win_size-1] for t in range(0, Nt-win_size+1, step) ])
             X.append(x_s)
@@ -272,8 +286,8 @@ def get_features_sample(x_t):
         features.append( np.sqrt(np.mean(np.power(x_,2), axis=axis)))   
     features = np.concatenate(np.array(features), axis=-1)
 
-    if np.ndim(features) == 1: return features.reshape(60,2)
-    return features.reshape(-1, 60, 2)
+    if np.ndim(features) == 1: return features.reshape(60,-1)
+    return features.reshape(np.shape(x_t)[0], 60, -1)
 
     # if np.ndim(features) == 1: return features.reshape(-1,1)
     # N, Nf = np.shape(features)

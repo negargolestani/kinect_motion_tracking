@@ -346,48 +346,6 @@ class SYNTHESIZER(object):
         return self.synthesize(train_data, **params)
 ####################################################################################################################################################
 ####################################################################################################################################################   
-def generate_synth_motion_data_(train_dataset_name_list, save_dataset_name=None, resample_dt=.1, **params):
-    train_dataset = defaultdict(list)
-    for train_dataset_name in train_dataset_name_list:
-        sys = SYSTEM(train_dataset_name)
-        dataset = sys.get_dataset(resample_dt=resample_dt, as_dict=True)
-        for key,value in dataset.items(): train_dataset[key].extend(value)
-    # Convert all inputs from list of list into into dixed length matrix 
-    Nt = min( [len(time) for time in train_dataset['time']])    
-    for key, value in train_dataset.items(): train_dataset.update({ key: np.array([v[:Nt] for v in train_dataset[key]]) }) 
-
-    synthesizer = SYNTHESIZER()
-    norm = train_dataset['norm']
-    center_1 = train_dataset['center_1']
-    center_2 = train_dataset['center_2']
-    norm_synth = synthesizer.generate( norm, cond=True, **params)
-    center_1_synth = synthesizer.generate( center_1, **params)
-    center_2_synth = center_1_synth + synthesizer.generate( center_2-center_1, cond=True, **params)
-    
-    # Save
-    if save_dataset_name is not None:
-        folder_path = get_dataset_folder_path(save_dataset_name) 
-        create_folder(folder_path + '/tst.csv')
-        time = np.arange(Nt) * resample_dt
-        
-        for n in range(norm_synth.shape[0]):
-            file_path = folder_path + '/record_' + "{0:0=4d}".format(n) + '.csv'
-            data = pd.DataFrame({
-                'time': time,
-                'norm': list(norm_synth[n]),
-                'center_1': list(center_1_synth[n]),
-                'center_2': list(center_2_synth[n])
-                })
-            data.to_csv(file_path, index=None) 
-    
-    
-    return dict({
-        'time': np.arange(Nt) * resample_dt,
-        'norm': norm_synth,
-        'center_1': center_1_synth,
-        'center_2': center_2_synth
-        })
-####################################################################################################################################################   
 def generate_synth_motion_data(train_dataset_name_list, save_dataset_name=None, resample_dt=.1, Ncoils=2, **params):
     train_dataset = defaultdict(list)
     for train_dataset_name in train_dataset_name_list:
@@ -447,5 +405,5 @@ def generate_synth_motion_data(train_dataset_name_list, save_dataset_name=None, 
 #     # Get data from raw measured data and Save as CSV file to load faster for regression    
 #     sys = SYSTEM('arduino_02')
 #     for n in range(20): data = sys.get_data('record_' + "{0:0=2d}".format(n), save=True)
-#     synth_dataset = generate_synth_motion_data( ['arduino'], save_dataset_name='synth', resample_dt=.1, Ncoils=2, N=2000, window_length=15, epochs=500, hiddendim=300, latentdim=300)
+    # synth_dataset = generate_synth_motion_data( ['arduino'], save_dataset_name='synth_3coils', Ncoils=3, N=2000, resample_dt=.1, window_length=15, epochs=500, hiddendim=300, latentdim=300)
 ####################################################################################################################################################
