@@ -29,7 +29,7 @@ class SYSTEM(object):
         return               
     ################################################################################################################################################
     def get_motion(self, file_name, th=3, window_length=5, sampler_kind='linear'):
-      
+
         # Reader
         reader_markers_df = self.reader.load_markers(self.dataset_name, file_name)
         reader_markers = np.array(reader_markers_df.markers.to_list()).reshape( [ len(reader_markers_df), -1, 3])
@@ -37,7 +37,7 @@ class SYSTEM(object):
         reader_center = np.nanmedian( np.nanmean( reader_markers[:10], axis=1), axis=0)
 
         # Tags
-        tags_markers_df = [tag.load_markers(self.dataset_name, file_name) for tag in self.tags]
+        tags_markers_df = [tag.load_markers(self.dataset_name, file_name) for tag in self.tags if tag.color is not None]
         tags_markers = np.array([np.array(tag_markers_df.markers.to_list()).reshape( [ len(tags_markers_df[0]), -1, 3]) for tag_markers_df in tags_markers_df])
         M = np.concatenate(tags_markers, axis=1) 
         Nt, Nm, _ = np.shape(M)
@@ -55,11 +55,12 @@ class SYSTEM(object):
         tags_norm = signal.medfilt(tags_norm, [1, window_length,1])
         tags_norm = np.nanmedian(tags_norm, axis=0)
         tags_norm = signal.medfilt(tags_norm, [window_length,1])
-        
+
         finite_idxs = np.where(np.all(np.isfinite(tags_norm), axis=1))[0]
         for n in range(3):
             resampler = interpolate.interp1d(time[finite_idxs], tags_norm[finite_idxs,n], kind=sampler_kind)
-            tags_norm[5:-5,n] = np.nan_to_num( resampler(time[5:-5]) )         
+            # tags_norm[5:-5,n] = np.nan_to_num( resampler(time[5:-5]) )  
+            tags_norm[finite_idxs[0]:finite_idxs[-1],n] = np.nan_to_num( resampler(time[finite_idxs[0]:finite_idxs[-1]]) )         
         tags_norm /= ( np.reshape(np.linalg.norm(tags_norm, axis=1), (-1,1)) * np.ones((1,3)) + eps)
 
         # Center
@@ -69,18 +70,17 @@ class SYSTEM(object):
                 dist = np.sum(np.multiply( tags_norm, tags_markers[i,:,j,:]-plane_point), axis=1).reshape(-1,1) * np.ones([1,3])
                 tags_markers[i,:,j,:] -= np.multiply( dist, tags_norm )
 
-        tags_centers = np.array([ np.nanmean(tags_markers[i], axis=1) for i in range(2) ])
-        tags_centers = np.array([ signal.medfilt(tags_centers[i], [window_length,1])  for i in range(2) ])
+        tags_centers = np.array([ np.nanmean(tags_markers[i], axis=1) for i in range(len(tags_markers)) ])
+        tags_centers = np.array([ signal.medfilt(tags_centers[i], [window_length,1])  for i in range(len(tags_markers)) ])
 
-        dc = tags_centers[1]-tags_centers[0]
-        d = np.linalg.norm(dc, axis=1)
-        D = np.nanmedian(d)
-        nc = dc / ( d.reshape([-1,1]) * np.ones((1,3)) + eps)
+        center = np.nanmean(tags_centers,axis=0)
+        for i, tag_center in enumerate(tags_centers): 
+            dc = tag_center - center
+            d = np.linalg.norm(dc, axis=1)
+            D = np.nanmedian(d)
+            nc = dc / ( d.reshape([-1,1]) * np.ones((1,3)) + eps)
+            tags_centers[i] = center + D*nc
 
-        tags_centers[0] -= np.multiply( (D-d).reshape([-1,1]) * np.ones([1,3]), nc)
-        tags_centers[1] += np.multiply( (D-d).reshape([-1,1]) * np.ones([1,3]), nc)
-
-        # Get Relative Motion: makes reader centered at origin (0,0,0) awith surface normal of (0,0,1)
         tags_centers -= reader_center
 
         if reader_norm[1] == 0: thetaX = 0
@@ -88,23 +88,23 @@ class SYSTEM(object):
         thetaY = atan( -reader_norm[0] / sqrt(reader_norm[1]**2 + reader_norm[2]**2 + eps) )
         R_rot = get_rotationMatrix(thetaX, thetaY, 0)
 
-        for n in range(2): tags_centers[n] = np.matmul(R_rot, tags_centers[n].transpose()).transpose()
+        for n in range(len(tags_markers)): tags_centers[n] = np.matmul(R_rot, tags_centers[n].transpose()).transpose()
         tags_norm = np.matmul(R_rot, tags_norm.transpose()).transpose()
 
-        return pd.DataFrame({
-            'time': time,
-            'norm': list(tags_norm),
-            'center_1': list(tags_centers[0]),
-            'center_2': list(tags_centers[1])
-            })   
+        clean_idx = np.all(np.all(~np.isnan(tags_centers),axis=2), axis=0) * np.all(~np.isnan(tags_norm), axis=1)
+        data = dict( time = time[clean_idx], norm = list(tags_norm[clean_idx]) )
+        for n in range(len(tags_markers)): data.update({'center_'+str(n+1):list(tags_centers[n,clean_idx])})
+        
+        return pd.DataFrame(data).dropna()  
     ################################################################################################################################################    
     def get_data(self, file_name, th=3, window_length=5, resample_dt=None, sampler_kind='linear', save=False):
         data = self.get_motion(file_name, th=3, window_length=5)
-
         for i, tag in enumerate(self.tags):
             tag_data = tag.load_measurements(self.dataset_name, file_name)
             tag_data.columns = [ '{}{}'.format(c,'' if c in ['time'] else '_'+str(i+1)) for c in tag_data.columns]
             data = pd.merge( data, tag_data, on='time', how='outer', suffixes=('', ''), sort=True)
+
+        data.dropna(inplace=True)
 
         if resample_dt is not None:
             resampling_time = np.arange(data.time.iloc[0], data.time.iloc[-1], resample_dt)
@@ -122,10 +122,12 @@ class SYSTEM(object):
                     val_new = np.zeros((len(time_new), val.shape[1]))
                     for n in range(val.shape[1]):
                         resampler = interpolate.interp1d(time, val[:,n], kind=sampler_kind)
-                        val_new[:,n] = np.nan_to_num( resampler(time_new) )          
+                        val_new[:,n] = resampler(time_new)         
+                        # val_new[:,n] = np.nan_to_num( val_new[:,n]  )          
                 else:
                     resampler = interpolate.interp1d(time, val, kind=sampler_kind)
-                    val_new = np.nan_to_num( resampler(time_new) ) 
+                    val_new = resampler(time_new)         
+                    # val_new = np.nan_to_num( val_new ) 
 
                 resampled_column = pd.DataFrame({'time':time_new, column:list(val_new)})
                 resampled_data = pd.merge( resampled_data, resampled_column, on='time', how='inner', suffixes=('', ''), sort=True)
@@ -174,16 +176,17 @@ class NODE(object):
 
         # Time
         date_time = pd.to_datetime( raw_df['time'] , format=datime_format)
-        time = [ np.round( (datetime.combine(date.min, t.time())-datetime.min).total_seconds(), 2) for t in date_time]
+        time = np.array([np.round( (datetime.combine(date.min, t.time())-datetime.min).total_seconds(), 2) for t in date_time])
         
         # Markers
-        markers = [list(map(float, l.replace(']','').replace('[','').replace('\n','').split(", "))) for l in raw_df[self.color].values]  
-        # markers = raw_df[self.color].apply(literal_eval).to_list()
-        markers_npy = np.array(markers).reshape(len(time), -1, 3)
+        markers = np.array([list(map(float, l.replace(']','').replace('[','').replace('\n','').split(", "))) for l in raw_df[self.color].values]) 
         
+        # markers = raw_df[self.color].apply(literal_eval).to_list()
+        # markers_npy = markers.reshape(len(time), -1, 3)        
+        clean_idx = np.where(np.all(~np.isnan(markers), axis=1))[0]
         return pd.DataFrame({
-            'time': time,
-            'markers': list(markers)
+            'time': time[clean_idx],
+            'markers': list(markers[clean_idx,:])
             })                
     ################################################################################################################################################
     def load_measurements(self, dataset_name, file_name):        
@@ -198,7 +201,7 @@ class NODE(object):
         # data.dropna(inplace=True)
         # data.reset_index(drop=True, inplace=True)
         # data.reset_index(inplace=True)
-        return data
+        return data.dropna()
     ################################################################################################################################################
     def load_rssi(self, dataset_name, file_name):
         # Load data 
@@ -231,7 +234,7 @@ class NODE(object):
         
         return pd.DataFrame({
             'time':time,
-            'vind':vind_df.tolist() 
+            'meas_vind':vind_df.tolist() 
             })
 ####################################################################################################################################################
 ####################################################################################################################################################
@@ -401,9 +404,9 @@ def generate_synth_motion_data(train_dataset_name_list, save_dataset_name=None, 
 
 
 ####################################################################################################################################################
-# if __name__ == '__main__':
+if __name__ == '__main__':
 #     # Get data from raw measured data and Save as CSV file to load faster for regression    
-#     sys = SYSTEM('arduino_02')
-#     for n in range(20): data = sys.get_data('record_' + "{0:0=2d}".format(n), save=True)
-    # synth_dataset = generate_synth_motion_data( ['arduino'], save_dataset_name='synth_3coils', Ncoils=3, N=2000, resample_dt=.1, window_length=15, epochs=500, hiddendim=300, latentdim=300)
+    sys = SYSTEM('arduino_parallel')
+    for n in range(20): data = sys.get_data('record_' + "{0:0=2d}".format(n), save=True)
+    # synth_dataset = generate_synth_motion_data( ['arduino'], save_dataset_name='synth_4coils', Ncoils=4, N=2000, resample_dt=.1, window_length=15, epochs=500, hiddendim=300, latentdim=300)
 ####################################################################################################################################################

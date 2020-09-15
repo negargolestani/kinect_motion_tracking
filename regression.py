@@ -37,17 +37,6 @@ def load_dataset(dataset_name, resample_dt=None, as_dict=True):
 
     return dataset
 ####################################################################################################################################################
-####################################################################################################################################################
-def get_delay(x, y):
-    # delay < 0 means that y starts 'delay' time steps before x 
-    # delay > 0 means that y starts 'delay' time steps after x
-    assert len(x) == len(y)
-    c = fftshift( np.real(ifft(fft(x) * fft(np.flipud(y)))) )   # cross correlation using fft
-    assert len(c) == len(x)
-    zero_index = int(len(x) / 2) - 1
-    delay = zero_index - np.argmax(c)
-    return delay
-####################################################################################################################################################
 
 
 ####################################################################################################################################################
@@ -68,10 +57,16 @@ class DATA(object):
 
         for data in dataset_df_list:            
             x = data.filter(regex=features).to_numpy()
-            y = np.nanmean(np.array([list(yn) for yn in data.filter(regex=target).to_numpy()]), axis=1)
-
-            if target == 'center': y = np.linalg.norm( y, axis=1)
-            elif target == 'norm': y = np.arccos( y[:,2]) * 180/pi
+            if target[:6] == 'center':
+                y = np.nanmean(np.array([list(yn) for yn in data.filter(regex='center').to_numpy()]), axis=1)
+                if target == 'center': y = np.linalg.norm( y, axis=1)
+                elif target == 'center_x': y = y[:,0]
+                elif target == 'center_y': y = y[:,1]
+                elif target == 'center_z': y = y[:,2]
+            if target == 'norm': 
+                y = np.nanmean(np.array([list(yn) for yn in data.filter(regex='norm').to_numpy()]), axis=1)
+                y = np.arccos( y[:,2]) * 180/pi
+                
             self.X.append(x)
             self.Y.append(y)
         

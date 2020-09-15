@@ -97,7 +97,7 @@ class KINECT(object):
 ####################################################################################################################################################
 if __name__ == '__main__':
     
-    dataset_name ='dataset_07'
+    dataset_name ='arduino_parallel'
     file_name = 'record_19'
     record_time = 40
 

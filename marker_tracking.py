@@ -107,9 +107,9 @@ class RECORD(object):
 ################################################################################################################################################
 if __name__ == '__main__':
 
-    dataset_name = 'dataset_07'
-    colors = ['red','blue','green'] 
-    n_circles = [4,3,3]
+    dataset_name = 'arduino_parallel'
+    colors = ['red','blue'] 
+    n_circles = [4,3]
 
 
     for n in range(20):
