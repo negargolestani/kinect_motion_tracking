@@ -1,6 +1,21 @@
 
 from utils import*
 
+import tensorflow as tf
+from keras.models import Sequential, Model
+from keras.layers import Input, Dense, Lambda, Layer, Add, Multiply, LSTM, SimpleRNN, Dropout, BatchNormalization, MaxPooling1D, Flatten, Conv1D, Conv2D
+from sklearn.metrics import*
+from keras import backend as K
+from pycaret.regression import*
+from IPython.display import display, clear_output
+
+import keras
+import tcn
+from sklearn.linear_model import LinearRegression
+from sklearn.neural_network import MLPRegressor
+from sklearn.datasets import make_regression
+from sklearn.model_selection import train_test_split
+from keras.optimizers import*
 
 
 
@@ -48,48 +63,7 @@ class DATA(object):
         else:
             self.X = np.array(X)  
             self.Y = np.array(Y)        
-        return
-    ######################################################################################################
-    def load( self, dataset_name, features='synth_vind', target='center'):
-        
-        dataset_df_list = load_dataset(dataset_name, as_dict=False)
-        self.X, self.Y = list(), list()
-
-        for data in dataset_df_list:            
-            x = data.filter(regex=features).to_numpy()
-            if target[:6] == 'center':
-                y = np.nanmean(np.array([list(yn) for yn in data.filter(regex='center').to_numpy()]), axis=1)
-                if target == 'center': y = np.linalg.norm( y, axis=1)
-                elif target == 'center_x': y = y[:,0]
-                elif target == 'center_y': y = y[:,1]
-                elif target == 'center_z': y = y[:,2]
-            if target == 'norm': 
-                y = np.nanmean(np.array([list(yn) for yn in data.filter(regex='norm').to_numpy()]), axis=1)
-                y = np.arccos( y[:,2]) * 180/pi
-                
-            self.X.append(x)
-            self.Y.append(y)
-        
-        self.X = np.array(self.X)
-        self.Y = np.array(self.Y)
-        return         
-    ######################################################################################################
-    def load_( self, dataset_name, features=['synth_vind_1', 'synth_vind_2'], target='center_1'):
-        
-        dataset_df_list = load_dataset(dataset_name, as_dict=False)
-        self.X, self.Y = list(), list()
-
-        for data in dataset_df_list:            
-            x = data.filter(regex=features).to_numpy()
-            y = np.array( data[target].to_list() )
-            if target[:6] == 'center': y = np.linalg.norm( y, axis=1)
-            elif target == 'norm': y = np.arccos( y[:,2]) * 180/pi
-            self.X.append(x)
-            self.Y.append(y)
-        
-        self.X = np.array(self.X)
-        self.Y = np.array(self.Y)
-        return         
+        return        
     ######################################################################################################
     def segment(self, win_size, step=None):
         # returns Nsample list of n * win_size * Nf   where n is number of segments extracted from Nt samples 

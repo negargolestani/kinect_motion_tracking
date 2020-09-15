@@ -349,7 +349,7 @@ class SYNTHESIZER(object):
         return self.synthesize(train_data, **params)
 ####################################################################################################################################################
 ####################################################################################################################################################   
-def generate_synth_motion_data(train_dataset_name_list, save_dataset_name=None, resample_dt=.1, Ncoils=2, **params):
+def generate_synth_motion_data_(train_dataset_name_list, save_dataset_name=None, resample_dt=.1, Ncoils=1, **params):
     train_dataset = defaultdict(list)
     for train_dataset_name in train_dataset_name_list:
         sys = SYSTEM(train_dataset_name)
@@ -401,12 +401,69 @@ def generate_synth_motion_data(train_dataset_name_list, save_dataset_name=None, 
             centers = centers_synth
         )
 ####################################################################################################################################################   
+def generate_synth_motion_data(train_dataset_name_list, save_dataset_name=None, resample_dt=.1, Ncoils=1, **params):
+    train_dataset = defaultdict(list)
+    for train_dataset_name in train_dataset_name_list:
+        sys = SYSTEM(train_dataset_name)
+        dataset = sys.get_dataset(resample_dt=resample_dt, as_dict=True)
+        for key,value in dataset.items(): train_dataset[key].extend(value)
+    # Convert all inputs from list of list into into dixed length matrix 
+    Nt = min( [len(time) for time in train_dataset['time']])    
+    for key, value in train_dataset.items(): train_dataset.update({ key: np.array([v[:Nt] for v in train_dataset[key]]) }) 
+
+    norm = train_dataset['norm']
+    centers = np.array([ value for key,value in train_dataset.items() if key[:6] == 'center'])
+    center = np.nanmean(centers, axis=0)
+    
+    synthesizer = SYNTHESIZER()
+    norm_synth = synthesizer.generate( norm, cond=True, **params)
+    center_synth = synthesizer.generate( center, **params)
+    centers_synth = np.zeros((Ncoils, center_synth.shape[0], center_synth.shape[1], center_synth.shape[2]))
+
+    if Ncoils==1:
+        centers_synth[0,:,:,:] = center_synth
+
+    else:
+        d_centers = np.array([center_n-center for center_n in centers])
+        d = np.nanmedian(np.linalg.norm(d_centers, axis=-1)) 
+        phi = np.arctan2(d_centers[0,:,:,1], d_centers[0,:,:,0])
+
+        phi_synth = synthesizer.generate( phi, **params)
+        phi_synth = phi_synth[:,:,0]
+
+        for i in range(centers_synth.shape[1]):
+            for j in range(centers_synth.shape[2]):
+                R_rot = get_rotationMatrix( 
+                    np.arctan(norm_synth[i,j,1]/norm_synth[i,j,2] ), 
+                    -np.arctan(norm_synth[i,j,0]/np.sqrt(norm_synth[i,j,1]**2+norm_synth[i,j,2]**2)), 0).transpose()
+                for n in range(centers_synth.shape[0]): 
+                    phi_n = phi_synth[i,j] + n * 2*pi/Ncoils
+                    c_n = np.array([ d*np.cos(phi_n), d*np.sin(phi_n), 0 ])             
+                    centers_synth[n,i,j,:] = np.matmul(R_rot, c_n.reshape(3,1)).reshape(1,3)[0] + center_synth[i,j]
+
+    if save_dataset_name is not None:
+        folder_path = get_dataset_folder_path(save_dataset_name) 
+        create_folder(folder_path + '/tst.csv')
+        time = list(np.arange(Nt)*resample_dt)
+        
+        for m in range(norm_synth.shape[0]):
+            file_path = folder_path + '/record_' + "{0:0=4d}".format(m) + '.csv'
+            data =  pd.DataFrame({ 'time': time, 'norm': list(norm_synth[m]) }) 
+            for n in range(Ncoils): data['center_'+str(n+1)] = list(centers_synth[n, m]) 
+            data.to_csv(file_path, index=None) 
+    else:
+        return dict(
+            time = list(np.arange(Nt)*resample_dt),
+            norm = norm_synth,
+            centers = centers_synth
+        )
+####################################################################################################################################################   
 
 
 ####################################################################################################################################################
 if __name__ == '__main__':
 #     # Get data from raw measured data and Save as CSV file to load faster for regression    
-    sys = SYSTEM('arduino_parallel')
-    for n in range(20): data = sys.get_data('record_' + "{0:0=2d}".format(n), save=True)
-    # synth_dataset = generate_synth_motion_data( ['arduino'], save_dataset_name='synth_4coils', Ncoils=4, N=2000, resample_dt=.1, window_length=15, epochs=500, hiddendim=300, latentdim=300)
+    # sys = SYSTEM('arduino_parallel')
+    # for n in range(20): data = sys.get_data('record_' + "{0:0=2d}".format(n), save=True)
+    synth_dataset = generate_synth_motion_data( ['arduino_parallel'], save_dataset_name='synth_2coils_parallel', Ncoils=1, N=2000, resample_dt=.1, window_length=15, epochs=500, hiddendim=300, latentdim=300)
 ####################################################################################################################################################
