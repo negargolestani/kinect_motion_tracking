@@ -1,7 +1,6 @@
 
 from utils import*
 
-
 ####################################################################################################################################################
 class SYSTEM(object):
     ################################################################################################################################################
@@ -80,9 +79,9 @@ class SYSTEM(object):
             D = np.nanmedian(d)
             nc = dc / ( d.reshape([-1,1]) * np.ones((1,3)) + eps)
             tags_centers[i] = center + D*nc
-
+        
+        # Relative motion data
         tags_centers -= reader_center
-
         if reader_norm[1] == 0: thetaX = 0
         else: thetaX = atan( reader_norm[1]/reader_norm[2] )    
         thetaY = atan( -reader_norm[0] / sqrt(reader_norm[1]**2 + reader_norm[2]**2 + eps) )
