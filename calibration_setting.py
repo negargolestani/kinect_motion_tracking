@@ -1,5 +1,4 @@
 from utils import*
-from kinect_recording import KINECT
 
 ####################################################################################################################################################
 def get_image( dataset_name, image_name ):
