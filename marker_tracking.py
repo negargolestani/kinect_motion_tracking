@@ -3,7 +3,7 @@ from utils import*
 
 if __name__ == '__main__':
 
-    dataset_name = 'arduino_parallel_new'
+    dataset_name = 'arduino_parallel_1'
     colors = ['red','blue'] 
     n_circles = [4,3]
 

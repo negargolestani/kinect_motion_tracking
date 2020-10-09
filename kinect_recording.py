@@ -2,8 +2,8 @@ from utils import*
 
 if __name__ == '__main__':
     
-    dataset_name ='arduino_parallel_new'
-    file_name = 'record_00'
+    dataset_name ='arduino_parallel_1'
+    file_name = 'record_19'
     record_time = 40
 
 
