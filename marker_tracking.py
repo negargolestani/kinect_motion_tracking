@@ -3,9 +3,9 @@ from utils import*
 
 if __name__ == '__main__':
 
-    dataset_name = 'arduino_parallel_1'
-    colors = ['red','blue'] 
-    n_circles = [4,3]
+    dataset_name = 'arduino_orthogonal'
+    colors = ['red','blue', 'green'] 
+    n_circles = [4,3,1]
 
 
     for n in range(20):

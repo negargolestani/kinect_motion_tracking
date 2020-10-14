@@ -2,7 +2,7 @@ from utils import*
 
 if __name__ == '__main__':
     
-    dataset_name ='arduino_parallel_1'
+    # dataset_name ='arduino_orthogonal'
     file_name = 'record_19'
     record_time = 40
 
