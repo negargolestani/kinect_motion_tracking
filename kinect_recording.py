@@ -2,9 +2,9 @@ from utils import*
 
 if __name__ == '__main__':
     
-    # dataset_name ='arduino_orthogonal'
-    file_name = 'record_19'
-    record_time = 40
+    dataset_name ='arduino'     # Dataset name (folder name)
+    file_name = 'record_01'     # Record name (file name)
+    record_time = 40            # Recoding time (s)
 
 
     # Initialization
@@ -23,7 +23,7 @@ if __name__ == '__main__':
     camera_space_list = list()
 
 
-    # Show when kinect starts recording
+    # Shows when kinect starts recording
     kinect.read(full=False)
     print('Recording is Started \n  Press "Esc" Key to Stop Recording')
     time_lib.sleep(2)
@@ -41,5 +41,5 @@ if __name__ == '__main__':
     print('Recording is Finished \n Wait for Saving ...')    
     time_df.to_csv(time_file_path, index=False)        
     with open(camera_space_file_path,"wb") as f: pickle.dump(camera_space_list, f)            
-   
+
     print('Done!')
